@@ -1,2 +1,17 @@
-# agentic-sdlc-orchestrator
-Agentic SDLC orchestrator in Java: turns a requirement into reviewed code, tests and docs using a dependency graph with gates, human approvals, retries, rollback, safe-stop, audit trail and reliability metrics. Demonstrated on a URL shortener.
+# Agentic SDLC Orchestrator
+
+An agentic software engineering platform that carries a requirement through the
+full SDLC (requirements, design, implementation, testing, documentation and
+release readiness) under explicit governance.
+
+**What it is:** an orchestration layer built around a dependency graph with
+entry and exit gates, parallel paths with joins, human approval checkpoints,
+bounded retries, fallback, rollback, safe-stop, policy guardrails, an
+audit-grade event log, reliability metrics and dynamic re-planning.
+
+**What it demonstrates it on:** a URL shortener service, built from scratch
+(greenfield), enhanced with expiry and rate limiting (brownfield), and driven
+from an ambiguous requirement ("make links safer") that triggers clarification.
+
+Agents execute inside defined autonomy boundaries. Humans own approvals and
+final quality.
