@@ -1,0 +1,16 @@
+# Files of the verified "expiry + per-IP rate limit" change set, relative to the project root.
+# Every entry has a matching "<path>.txt" resource next to this manifest.
+src/main/java/com/agentic/shortener/model/Link.java
+src/main/java/com/agentic/shortener/repository/LinkRepository.java
+src/main/java/com/agentic/shortener/dto/LinkDtos.java
+src/main/java/com/agentic/shortener/error/LinkExpiredException.java
+src/main/java/com/agentic/shortener/error/InvalidExpiryException.java
+src/main/java/com/agentic/shortener/error/GlobalExceptionHandler.java
+src/main/java/com/agentic/shortener/service/LinkService.java
+src/main/java/com/agentic/shortener/api/LinkController.java
+src/main/java/com/agentic/shortener/ratelimit/TokenBucket.java
+src/main/java/com/agentic/shortener/ratelimit/RateLimitFilter.java
+src/main/resources/application.properties
+src/test/java/com/agentic/shortener/ratelimit/TokenBucketTest.java
+src/test/java/com/agentic/shortener/api/LinkExpiryApiTest.java
+src/test/java/com/agentic/shortener/api/RateLimitApiTest.java

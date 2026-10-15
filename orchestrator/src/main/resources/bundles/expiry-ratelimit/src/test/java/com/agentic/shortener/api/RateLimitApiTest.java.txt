@@ -1,0 +1,38 @@
+package com.agentic.shortener.api;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+
+/** A tiny bucket (3 requests, practically no refill) makes the limit observable. */
+@SpringBootTest(properties = {"shortener.ratelimit.capacity=3", "shortener.ratelimit.refill-per-second=0.001"})
+@AutoConfigureMockMvc
+class RateLimitApiTest {
+
+    @Autowired
+    MockMvc mvc;
+
+    @Test
+    void requestsBeyondTheLimitGet429WithRetryAfter() throws Exception {
+        for (int i = 0; i < 3; i++) {
+            assertThat(mvc.perform(get("/api/v1/links/missing")).andReturn().getResponse().getStatus()).isEqualTo(404);
+        }
+        MvcResult limited = mvc.perform(get("/api/v1/links/missing")).andReturn();
+        assertThat(limited.getResponse().getStatus()).isEqualTo(429);
+        assertThat(limited.getResponse().getHeader("Retry-After")).isNotBlank();
+        assertThat(limited.getResponse().getContentAsString()).contains("Too many requests");
+    }
+
+    @Test
+    void healthEndpointIsNotRateLimited() throws Exception {
+        for (int i = 0; i < 10; i++) {
+            assertThat(mvc.perform(get("/actuator/health")).andReturn().getResponse().getStatus()).isEqualTo(200);
+        }
+    }
+}

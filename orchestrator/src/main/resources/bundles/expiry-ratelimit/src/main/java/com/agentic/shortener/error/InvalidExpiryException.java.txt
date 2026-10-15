@@ -1,0 +1,8 @@
+package com.agentic.shortener.error;
+
+/** The requested expiry time is not acceptable (for example already in the past). */
+public class InvalidExpiryException extends RuntimeException {
+    public InvalidExpiryException(String message) {
+        super(message);
+    }
+}

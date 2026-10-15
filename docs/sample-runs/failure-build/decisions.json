@@ -1,0 +1,207 @@
+[ {
+  "id" : "D-1",
+  "node" : "requirements",
+  "actor" : "requirements",
+  "decision" : "completed",
+  "rationale" : "kept scope to what the requirement states; recorded 4 assumptions explicitly instead of guessing silently",
+  "inputs" : { },
+  "outputs" : {
+    "docs/requirements.md" : "07ddd24182b7aa02db069ace1802f62d1e656475e6fd255c9effe465a518727f"
+  },
+  "at" : "2026-10-15T08:25:23.666710884Z"
+}, {
+  "id" : "D-2",
+  "node" : "design",
+  "actor" : "architect",
+  "decision" : "completed",
+  "rationale" : "contract-first: the OpenAPI file is the reviewed artefact that the implementation must follow",
+  "inputs" : {
+    "docs/requirements.md" : "07ddd24182b7aa02db069ace1802f62d1e656475e6fd255c9effe465a518727f"
+  },
+  "outputs" : {
+    "docs/design.md" : "6c089dafa586b99e7e8d916fdfe4b92870e015b42960cca5cad83f82195328f9",
+    "openapi.yaml" : "488e995a81b4e8a38f617f63d0cb171bd5f64ea668ac662c3e890170dd786cef"
+  },
+  "at" : "2026-10-15T08:25:23.689667862Z"
+}, {
+  "id" : "D-3",
+  "node" : "design",
+  "actor" : "human:simulated-reviewer",
+  "decision" : "approved",
+  "rationale" : "reviewed and approved (simulated)",
+  "inputs" : {
+    "docs/requirements.md" : "07ddd24182b7aa02db069ace1802f62d1e656475e6fd255c9effe465a518727f"
+  },
+  "outputs" : {
+    "docs/design.md" : "6c089dafa586b99e7e8d916fdfe4b92870e015b42960cca5cad83f82195328f9",
+    "openapi.yaml" : "488e995a81b4e8a38f617f63d0cb171bd5f64ea668ac662c3e890170dd786cef"
+  },
+  "at" : "2026-10-15T08:25:23.689792963Z"
+}, {
+  "id" : "D-4",
+  "node" : "test-plan",
+  "actor" : "test",
+  "decision" : "completed",
+  "rationale" : "tests are planned from the requirement in parallel with the design, so they are not biased by the implementation",
+  "inputs" : {
+    "docs/requirements.md" : "07ddd24182b7aa02db069ace1802f62d1e656475e6fd255c9effe465a518727f"
+  },
+  "outputs" : {
+    "docs/test-plan.md" : "bf12b68911d95f8af3612462c526423f48b8da1d6bdc5a38457f96d977b19015"
+  },
+  "at" : "2026-10-15T08:25:23.719000709Z"
+}, {
+  "id" : "D-5",
+  "node" : "implement",
+  "actor" : "golden-developer (fallback)",
+  "decision" : "completed",
+  "rationale" : "fallback to the known-good implementation after the primary agent could not satisfy the gates",
+  "inputs" : {
+    "docs/design.md" : "6c089dafa586b99e7e8d916fdfe4b92870e015b42960cca5cad83f82195328f9",
+    "openapi.yaml" : "488e995a81b4e8a38f617f63d0cb171bd5f64ea668ac662c3e890170dd786cef"
+  },
+  "outputs" : {
+    "src/main/java/com/agentic/shortener/error/LinkNotFoundException.java" : "857cbb3e4e2d8a289b04e1a8ccc5730fa1e0cc8a4af999460bd9b932605fbdeb",
+    "src/main/java/com/agentic/shortener/error/InvalidUrlException.java" : "a4c5e8f00e23ce1c63a18619ae2ffcfcbfa33754029c9f8b0b66918c5f50a659",
+    "src/main/java/com/agentic/shortener/model/Click.java" : "a107581d7d82fdc11cd77c02d5447b2ef49e1d80ec734ac6f33c3301dc134593",
+    "src/main/java/com/agentic/shortener/error/InvalidAliasException.java" : "a99eb3e08c6a3a1172aaafd5f87330eeb3d6cd656a3704be491a5bdf15efdd81",
+    "src/main/java/com/agentic/shortener/service/LinkService.java" : "b8859e34296455cd2a1e3abd12cedfaaf9e3bcb73bf8e93fe82a661e1e836e11",
+    "src/main/java/com/agentic/shortener/api/LinkController.java" : "05871d7623104beb11f78b248694856f582e4bfb7fe726b674528945fd9a3af1",
+    "src/main/java/com/agentic/shortener/repository/ClickRepository.java" : "457ff4fb92547bb9cfca4b68717c2f3199ecdd5e6642fc0a2c7f5c142c60d214",
+    "src/main/java/com/agentic/shortener/repository/LinkRepository.java" : "556df6d72bff0a1b2226c19c9339db49f25f174dc486ad8571a81c745c7566e4",
+    "src/main/java/com/agentic/shortener/UrlShortenerApplication.java" : "97f8f9e8447715957403823908df1fb588050ceecfb01024899a3a579d38ab06",
+    "src/main/java/com/agentic/shortener/api/RedirectController.java" : "82931653c712cefb2d7256c8773ca29f76581b915e1945ae3ac3f371e8524567",
+    "pom.xml" : "e2d162df442441d6aefcaaa8a45234000e1e85ce66390836f8e8c4061d5db911",
+    "src/main/java/com/agentic/shortener/service/CodeGenerator.java" : "5094eab074d989a88d983d938c1b9a9af2ceecd65221cae33b4103e82b700587",
+    "src/main/resources/application.properties" : "112e1a466f057ec831b5a1930e06aa0359fc2bbe7b3f4a32389a771e96306fd4",
+    "src/main/java/com/agentic/shortener/validation/UrlValidator.java" : "3c14323b486e05261654cffce6dadbfbc0b30f9af00b51ca86c61810a70dedca",
+    "src/main/java/com/agentic/shortener/model/Link.java" : "aab58ad58ceb67f95f34bc0a033ff52e6a8eb25ba2c7de4858d793cdf596a027",
+    "src/main/java/com/agentic/shortener/error/AliasConflictException.java" : "904c87287cc1106af8f472c8f98c59a07f2d6a3ae324b52a471af54d773a5bfa",
+    "src/main/java/com/agentic/shortener/error/GlobalExceptionHandler.java" : "e2d26f21678d6a66d98ebc9c301e165f17b100ff565bfb41cb885a0c14974686",
+    "src/main/java/com/agentic/shortener/dto/LinkDtos.java" : "0b81a5d0662093ff8bb4256f3391f91fcbdda6f063f790342b79f032c52ea725"
+  },
+  "at" : "2026-10-15T08:25:24.452278476Z"
+}, {
+  "id" : "D-6",
+  "node" : "tests",
+  "actor" : "test",
+  "decision" : "completed",
+  "rationale" : "the result is recorded in the run context; the exit gate, not the agent, decides acceptance",
+  "inputs" : {
+    "src/main/java/com/agentic/shortener/repository/LinkRepository.java" : "556df6d72bff0a1b2226c19c9339db49f25f174dc486ad8571a81c745c7566e4",
+    "pom.xml" : "e2d162df442441d6aefcaaa8a45234000e1e85ce66390836f8e8c4061d5db911",
+    "src/main/java/com/agentic/shortener/error/InvalidAliasException.java" : "a99eb3e08c6a3a1172aaafd5f87330eeb3d6cd656a3704be491a5bdf15efdd81",
+    "src/main/java/com/agentic/shortener/model/Link.java" : "aab58ad58ceb67f95f34bc0a033ff52e6a8eb25ba2c7de4858d793cdf596a027",
+    "src/main/java/com/agentic/shortener/service/CodeGenerator.java" : "5094eab074d989a88d983d938c1b9a9af2ceecd65221cae33b4103e82b700587",
+    "src/main/java/com/agentic/shortener/model/Click.java" : "a107581d7d82fdc11cd77c02d5447b2ef49e1d80ec734ac6f33c3301dc134593",
+    "src/main/java/com/agentic/shortener/service/LinkService.java" : "b8859e34296455cd2a1e3abd12cedfaaf9e3bcb73bf8e93fe82a661e1e836e11",
+    "src/main/resources/application.properties" : "112e1a466f057ec831b5a1930e06aa0359fc2bbe7b3f4a32389a771e96306fd4",
+    "src/main/java/com/agentic/shortener/error/GlobalExceptionHandler.java" : "e2d26f21678d6a66d98ebc9c301e165f17b100ff565bfb41cb885a0c14974686",
+    "src/main/java/com/agentic/shortener/api/RedirectController.java" : "82931653c712cefb2d7256c8773ca29f76581b915e1945ae3ac3f371e8524567",
+    "src/main/java/com/agentic/shortener/error/InvalidUrlException.java" : "a4c5e8f00e23ce1c63a18619ae2ffcfcbfa33754029c9f8b0b66918c5f50a659",
+    "src/main/java/com/agentic/shortener/repository/ClickRepository.java" : "457ff4fb92547bb9cfca4b68717c2f3199ecdd5e6642fc0a2c7f5c142c60d214",
+    "src/main/java/com/agentic/shortener/error/AliasConflictException.java" : "904c87287cc1106af8f472c8f98c59a07f2d6a3ae324b52a471af54d773a5bfa",
+    "src/main/java/com/agentic/shortener/UrlShortenerApplication.java" : "97f8f9e8447715957403823908df1fb588050ceecfb01024899a3a579d38ab06",
+    "src/main/java/com/agentic/shortener/error/LinkNotFoundException.java" : "857cbb3e4e2d8a289b04e1a8ccc5730fa1e0cc8a4af999460bd9b932605fbdeb",
+    "src/main/java/com/agentic/shortener/dto/LinkDtos.java" : "0b81a5d0662093ff8bb4256f3391f91fcbdda6f063f790342b79f032c52ea725",
+    "src/main/java/com/agentic/shortener/api/LinkController.java" : "05871d7623104beb11f78b248694856f582e4bfb7fe726b674528945fd9a3af1",
+    "docs/test-plan.md" : "bf12b68911d95f8af3612462c526423f48b8da1d6bdc5a38457f96d977b19015",
+    "src/main/java/com/agentic/shortener/validation/UrlValidator.java" : "3c14323b486e05261654cffce6dadbfbc0b30f9af00b51ca86c61810a70dedca"
+  },
+  "outputs" : {
+    "docs/test-report.md" : "68a515c9979f5758338b4c3ba18de8bd6c32e2971361a4cce1b5413bb6a65e02",
+    "src/test/java/com/agentic/shortener/api/LinkApiTest.java" : "1c6889128a7326bc57895dc294c271c6e982afff2a02db61482887d4cb1d0f61",
+    "src/test/java/com/agentic/shortener/service/CodeGeneratorTest.java" : "e73a4bd617bebb873b53829a3807eb0b5f46b8d2cb7f02d00c45b23ad46fb4aa",
+    "src/test/java/com/agentic/shortener/validation/UrlValidatorTest.java" : "283c1580a9035b92ecd648620f99218027cf26b977df8ab1c168d88a5105eced"
+  },
+  "at" : "2026-10-15T08:25:24.512998488Z"
+}, {
+  "id" : "D-7",
+  "node" : "security",
+  "actor" : "security",
+  "decision" : "completed",
+  "rationale" : "blocking findings fail the node; the agent cannot waive them",
+  "inputs" : {
+    "docs/test-report.md" : "68a515c9979f5758338b4c3ba18de8bd6c32e2971361a4cce1b5413bb6a65e02",
+    "src/test/java/com/agentic/shortener/api/LinkApiTest.java" : "1c6889128a7326bc57895dc294c271c6e982afff2a02db61482887d4cb1d0f61",
+    "src/test/java/com/agentic/shortener/service/CodeGeneratorTest.java" : "e73a4bd617bebb873b53829a3807eb0b5f46b8d2cb7f02d00c45b23ad46fb4aa",
+    "src/test/java/com/agentic/shortener/validation/UrlValidatorTest.java" : "283c1580a9035b92ecd648620f99218027cf26b977df8ab1c168d88a5105eced"
+  },
+  "outputs" : {
+    "docs/security-review.md" : "2e466ae476168eeec92d2b576bd98db7b2995c4e96d2f01ead49bb50142c84f0"
+  },
+  "at" : "2026-10-15T08:25:24.576233048Z"
+}, {
+  "id" : "D-8",
+  "node" : "docs",
+  "actor" : "docs",
+  "decision" : "completed",
+  "rationale" : "documentation is derived from the code so it cannot drift from the implementation",
+  "inputs" : {
+    "docs/test-report.md" : "68a515c9979f5758338b4c3ba18de8bd6c32e2971361a4cce1b5413bb6a65e02",
+    "src/test/java/com/agentic/shortener/api/LinkApiTest.java" : "1c6889128a7326bc57895dc294c271c6e982afff2a02db61482887d4cb1d0f61",
+    "src/test/java/com/agentic/shortener/service/CodeGeneratorTest.java" : "e73a4bd617bebb873b53829a3807eb0b5f46b8d2cb7f02d00c45b23ad46fb4aa",
+    "src/test/java/com/agentic/shortener/validation/UrlValidatorTest.java" : "283c1580a9035b92ecd648620f99218027cf26b977df8ab1c168d88a5105eced"
+  },
+  "outputs" : {
+    "README.md" : "0c6dd62c1f4c5c8a9d2076100e39f35b5c0067cc0523b54ef18be09a241e9750",
+    "docs/CHANGELOG.md" : "9a39a59ef8d9791e2227e00d8bdb5abda6059a2da2507d5a4119c782d84f427e"
+  },
+  "at" : "2026-10-15T08:25:24.731654229Z"
+}, {
+  "id" : "D-9",
+  "node" : "release",
+  "actor" : "release",
+  "decision" : "completed",
+  "rationale" : "release is blocked unless every check passes; the human approves afterwards",
+  "inputs" : {
+    "docs/CHANGELOG.md" : "9a39a59ef8d9791e2227e00d8bdb5abda6059a2da2507d5a4119c782d84f427e",
+    "docs/security-review.md" : "2e466ae476168eeec92d2b576bd98db7b2995c4e96d2f01ead49bb50142c84f0",
+    "README.md" : "0c6dd62c1f4c5c8a9d2076100e39f35b5c0067cc0523b54ef18be09a241e9750"
+  },
+  "outputs" : {
+    "docs/release-notes.md" : "ec40197f39cdbcc9bd8b031b63c1d4d62f74d774a135611c82d820f03ddcf21d"
+  },
+  "at" : "2026-10-15T08:25:24.794407879Z"
+}, {
+  "id" : "D-10",
+  "node" : "release",
+  "actor" : "human:simulated-reviewer",
+  "decision" : "approved",
+  "rationale" : "reviewed and approved (simulated)",
+  "inputs" : {
+    "docs/CHANGELOG.md" : "9a39a59ef8d9791e2227e00d8bdb5abda6059a2da2507d5a4119c782d84f427e",
+    "docs/security-review.md" : "2e466ae476168eeec92d2b576bd98db7b2995c4e96d2f01ead49bb50142c84f0",
+    "README.md" : "0c6dd62c1f4c5c8a9d2076100e39f35b5c0067cc0523b54ef18be09a241e9750"
+  },
+  "outputs" : {
+    "docs/release-notes.md" : "ec40197f39cdbcc9bd8b031b63c1d4d62f74d774a135611c82d820f03ddcf21d"
+  },
+  "at" : "2026-10-15T08:25:24.794619492Z"
+}, {
+  "id" : "D-11",
+  "node" : "signoff",
+  "actor" : "reviewer",
+  "decision" : "completed",
+  "rationale" : "the reviewer only summarises recorded facts; it does not approve its own work",
+  "inputs" : {
+    "docs/release-notes.md" : "ec40197f39cdbcc9bd8b031b63c1d4d62f74d774a135611c82d820f03ddcf21d"
+  },
+  "outputs" : {
+    "docs/engineering-summary.md" : "373be99e00b6c7e1786f36c09c7f0d51f62ca071b77e69afc3bba8a1d1a84795"
+  },
+  "at" : "2026-10-15T08:25:24.838283494Z"
+}, {
+  "id" : "D-12",
+  "node" : "signoff",
+  "actor" : "human:simulated-reviewer",
+  "decision" : "approved",
+  "rationale" : "reviewed and approved (simulated)",
+  "inputs" : {
+    "docs/release-notes.md" : "ec40197f39cdbcc9bd8b031b63c1d4d62f74d774a135611c82d820f03ddcf21d"
+  },
+  "outputs" : {
+    "docs/engineering-summary.md" : "373be99e00b6c7e1786f36c09c7f0d51f62ca071b77e69afc3bba8a1d1a84795"
+  },
+  "at" : "2026-10-15T08:25:24.838646618Z"
+} ]

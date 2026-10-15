@@ -1,0 +1,87 @@
+package com.agentic.shortener.api;
+
+import com.agentic.shortener.model.Link;
+import com.agentic.shortener.repository.LinkRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/** Link expiry: accepted in the future, rejected in the past, 410 once passed, stats stay readable. */
+@SpringBootTest
+@AutoConfigureMockMvc
+class LinkExpiryApiTest {
+
+    @Autowired
+    MockMvc mvc;
+
+    @Autowired
+    ObjectMapper json;
+
+    @Autowired
+    LinkRepository links;
+
+    private MvcResult create(String expiresAt) throws Exception {
+        String url = "http://203.0.113.20/" + UUID.randomUUID();
+        String body = expiresAt == null
+                ? "{\"url\":\"" + url + "\"}"
+                : "{\"url\":\"" + url + "\",\"expiresAt\":\"" + expiresAt + "\"}";
+        return mvc.perform(post("/api/v1/links").contentType(MediaType.APPLICATION_JSON).content(body)).andReturn();
+    }
+
+    private JsonNode body(MvcResult r) throws Exception {
+        return json.readTree(r.getResponse().getContentAsString());
+    }
+
+    @Test
+    void futureExpiryIsAcceptedAndReturned() throws Exception {
+        String when = Instant.now().plus(1, ChronoUnit.DAYS).truncatedTo(ChronoUnit.SECONDS).toString();
+        MvcResult r = create(when);
+        assertThat(r.getResponse().getStatus()).isEqualTo(201);
+        String code = body(r).get("code").asText();
+        assertThat(body(r).get("expiresAt").asText()).isEqualTo(when);
+        mvc.perform(get("/" + code)).andExpect(status().isFound());
+    }
+
+    @Test
+    void linksWithoutExpiryStillWork() throws Exception {
+        MvcResult r = create(null);
+        assertThat(r.getResponse().getStatus()).isEqualTo(201);
+        assertThat(body(r).get("expiresAt").isNull()).isTrue();
+    }
+
+    @Test
+    void expiryInThePastIsRejected() throws Exception {
+        String past = Instant.now().minus(1, ChronoUnit.HOURS).toString();
+        assertThat(create(past).getResponse().getStatus()).isEqualTo(400);
+    }
+
+    @Test
+    void expiredLinkAnswers410AndRecordsNoClick() throws Exception {
+        String code = body(create(Instant.now().plus(1, ChronoUnit.DAYS).toString())).get("code").asText();
+
+        Link link = links.findByCode(code).orElseThrow();
+        link.setExpiresAt(Instant.now().minus(1, ChronoUnit.MINUTES));
+        links.save(link);
+
+        mvc.perform(get("/" + code)).andExpect(status().isGone());
+        mvc.perform(get("/api/v1/links/" + code)).andExpect(status().isGone());
+
+        MvcResult stats = mvc.perform(get("/api/v1/links/" + code + "/stats")).andExpect(status().isOk()).andReturn();
+        assertThat(body(stats).get("totalClicks").asLong()).isZero();
+    }
+}

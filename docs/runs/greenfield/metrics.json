@@ -1,0 +1,14 @@
+{
+  "status" : "COMPLETED",
+  "totalNodes" : 9,
+  "doneNodes" : 9,
+  "firstAttemptSuccessRate" : 1.0,
+  "retries" : 0,
+  "rollbacks" : 0,
+  "fallbacks" : 0,
+  "safeStops" : 0,
+  "replans" : 0,
+  "approvals" : 3,
+  "avgMttrMillis" : 0.0,
+  "endToEndMillis" : 13065
+}

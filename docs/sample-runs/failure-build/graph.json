@@ -1,0 +1,100 @@
+[ {
+  "id" : "requirements",
+  "agent" : "requirements",
+  "fallbackAgent" : null,
+  "risk" : "LOW",
+  "state" : "DONE",
+  "attempts" : 1,
+  "dependsOn" : [ ],
+  "entryGate" : "none",
+  "exitGate" : "outputs-exist:docs/requirements.md",
+  "description" : "Normalise the requirement, list acceptance criteria and record assumptions"
+}, {
+  "id" : "design",
+  "agent" : "architect",
+  "fallbackAgent" : null,
+  "risk" : "HIGH",
+  "state" : "DONE",
+  "attempts" : 1,
+  "dependsOn" : [ "requirements" ],
+  "entryGate" : "inputs-available:docs/requirements.md",
+  "exitGate" : "outputs-exist:docs/design.md,openapi.yaml",
+  "description" : "Design the solution and the OpenAPI contract"
+}, {
+  "id" : "test-plan",
+  "agent" : "test",
+  "fallbackAgent" : null,
+  "risk" : "LOW",
+  "state" : "DONE",
+  "attempts" : 1,
+  "dependsOn" : [ "requirements" ],
+  "entryGate" : "none",
+  "exitGate" : "outputs-exist:docs/test-plan.md",
+  "description" : "Plan the tests from the requirement, in parallel with the design"
+}, {
+  "id" : "implement",
+  "agent" : "developer",
+  "fallbackAgent" : "golden-developer",
+  "risk" : "MEDIUM",
+  "state" : "DONE",
+  "attempts" : 4,
+  "dependsOn" : [ "design" ],
+  "entryGate" : "inputs-available:docs/design.md,openapi.yaml",
+  "exitGate" : "build-passes",
+  "description" : "Implement the service"
+}, {
+  "id" : "tests",
+  "agent" : "test",
+  "fallbackAgent" : null,
+  "risk" : "MEDIUM",
+  "state" : "DONE",
+  "attempts" : 1,
+  "dependsOn" : [ "implement", "test-plan" ],
+  "entryGate" : "none",
+  "exitGate" : "tests-pass",
+  "description" : "Write and run the automated tests"
+}, {
+  "id" : "security",
+  "agent" : "security",
+  "fallbackAgent" : null,
+  "risk" : "MEDIUM",
+  "state" : "DONE",
+  "attempts" : 1,
+  "dependsOn" : [ "tests" ],
+  "entryGate" : "none",
+  "exitGate" : "outputs-exist:docs/security-review.md",
+  "description" : "Security and compliance review"
+}, {
+  "id" : "docs",
+  "agent" : "docs",
+  "fallbackAgent" : null,
+  "risk" : "LOW",
+  "state" : "DONE",
+  "attempts" : 1,
+  "dependsOn" : [ "tests" ],
+  "entryGate" : "none",
+  "exitGate" : "outputs-exist:README.md,docs/CHANGELOG.md",
+  "description" : "Generate README and changelog from the code"
+}, {
+  "id" : "release",
+  "agent" : "release",
+  "fallbackAgent" : null,
+  "risk" : "HIGH",
+  "state" : "DONE",
+  "attempts" : 1,
+  "dependsOn" : [ "security", "docs" ],
+  "entryGate" : "none",
+  "exitGate" : "outputs-exist:docs/release-notes.md",
+  "description" : "Release readiness check and release notes"
+}, {
+  "id" : "signoff",
+  "agent" : "reviewer",
+  "fallbackAgent" : null,
+  "risk" : "HIGH",
+  "state" : "DONE",
+  "attempts" : 1,
+  "dependsOn" : [ "release" ],
+  "entryGate" : "none",
+  "exitGate" : "decisions-recorded",
+  "description" : "Engineering summary and final human sign-off"
+} ]

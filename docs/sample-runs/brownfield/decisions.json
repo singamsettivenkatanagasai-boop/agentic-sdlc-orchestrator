@@ -1,0 +1,336 @@
+[ {
+  "id" : "D-1",
+  "node" : "requirements",
+  "actor" : "requirements",
+  "decision" : "completed",
+  "rationale" : "kept scope to what the requirement states; recorded 6 assumptions explicitly instead of guessing silently",
+  "inputs" : { },
+  "outputs" : {
+    "docs/requirements.md" : "9bfee3ea06bb55d9463c52b17eafe7ea121abb7f9958c35cc80790084f91547d"
+  },
+  "at" : "2026-10-15T08:25:22.364591964Z"
+}, {
+  "id" : "D-2",
+  "node" : "test-plan",
+  "actor" : "test",
+  "decision" : "completed",
+  "rationale" : "tests are planned from the requirement in parallel with the design, so they are not biased by the implementation",
+  "inputs" : {
+    "docs/requirements.md" : "9bfee3ea06bb55d9463c52b17eafe7ea121abb7f9958c35cc80790084f91547d"
+  },
+  "outputs" : {
+    "docs/test-plan.md" : "594d95369843c681e0c8f8d22b73a93cfd16504bd4b43d14f128bf7dcc8e7d3c"
+  },
+  "at" : "2026-10-15T08:25:22.460015306Z"
+}, {
+  "id" : "D-3",
+  "node" : "impact",
+  "actor" : "architect",
+  "decision" : "completed",
+  "rationale" : "impact derived from the parsed code structure and the concerns found in the requirement",
+  "inputs" : { },
+  "outputs" : {
+    "docs/impact-analysis.md" : "368b765b61df95836d099e6acd86afde609e07d88c2de8ece0c21afec7d5cd30"
+  },
+  "at" : "2026-10-15T08:25:22.573234595Z"
+}, {
+  "id" : "D-4",
+  "node" : "design",
+  "actor" : "architect",
+  "decision" : "completed",
+  "rationale" : "contract-first: the OpenAPI file is the reviewed artefact that the implementation must follow",
+  "inputs" : {
+    "docs/impact-analysis.md" : "368b765b61df95836d099e6acd86afde609e07d88c2de8ece0c21afec7d5cd30",
+    "docs/requirements.md" : "9bfee3ea06bb55d9463c52b17eafe7ea121abb7f9958c35cc80790084f91547d"
+  },
+  "outputs" : {
+    "docs/design.md" : "c84dc61b209a3c6dc86073fb1b59ee83ced8f8f52abd6bd8c91bbc6d4507de8a",
+    "openapi.yaml" : "f99a652d3916bc691dffab22f1b5942774f11e7e32a62acf3dd5da8e90d8042b"
+  },
+  "at" : "2026-10-15T08:25:22.634182109Z"
+}, {
+  "id" : "D-5",
+  "node" : "design",
+  "actor" : "human:simulated-reviewer",
+  "decision" : "approved",
+  "rationale" : "reviewed and approved (simulated)",
+  "inputs" : {
+    "docs/impact-analysis.md" : "368b765b61df95836d099e6acd86afde609e07d88c2de8ece0c21afec7d5cd30",
+    "docs/requirements.md" : "9bfee3ea06bb55d9463c52b17eafe7ea121abb7f9958c35cc80790084f91547d"
+  },
+  "outputs" : {
+    "docs/design.md" : "c84dc61b209a3c6dc86073fb1b59ee83ced8f8f52abd6bd8c91bbc6d4507de8a",
+    "openapi.yaml" : "f99a652d3916bc691dffab22f1b5942774f11e7e32a62acf3dd5da8e90d8042b"
+  },
+  "at" : "2026-10-15T08:25:22.634365125Z"
+}, {
+  "id" : "D-6",
+  "node" : "migration",
+  "actor" : "golden-developer",
+  "decision" : "completed",
+  "rationale" : "deterministic change set; the need for it was established by the impact analysis",
+  "inputs" : {
+    "docs/design.md" : "c84dc61b209a3c6dc86073fb1b59ee83ced8f8f52abd6bd8c91bbc6d4507de8a",
+    "openapi.yaml" : "f99a652d3916bc691dffab22f1b5942774f11e7e32a62acf3dd5da8e90d8042b"
+  },
+  "outputs" : {
+    "src/main/resources/db/migration/V2__add_link_expiry.sql" : "dfe2cc50403f2b72945eb0a68e229a7ac7d2842ec0ca91010874e9a63ac095c3"
+  },
+  "at" : "2026-10-15T08:25:22.668344262Z"
+}, {
+  "id" : "D-7",
+  "node" : "migration",
+  "actor" : "human:simulated-reviewer",
+  "decision" : "approved",
+  "rationale" : "reviewed and approved (simulated)",
+  "inputs" : {
+    "docs/design.md" : "c84dc61b209a3c6dc86073fb1b59ee83ced8f8f52abd6bd8c91bbc6d4507de8a",
+    "openapi.yaml" : "f99a652d3916bc691dffab22f1b5942774f11e7e32a62acf3dd5da8e90d8042b"
+  },
+  "outputs" : {
+    "src/main/resources/db/migration/V2__add_link_expiry.sql" : "dfe2cc50403f2b72945eb0a68e229a7ac7d2842ec0ca91010874e9a63ac095c3"
+  },
+  "at" : "2026-10-15T08:25:22.668574688Z"
+}, {
+  "id" : "D-8",
+  "node" : "implement",
+  "actor" : "developer",
+  "decision" : "completed",
+  "rationale" : "implemented from the approved design and contract",
+  "inputs" : {
+    "src/main/resources/db/migration/V2__add_link_expiry.sql" : "dfe2cc50403f2b72945eb0a68e229a7ac7d2842ec0ca91010874e9a63ac095c3",
+    "openapi.yaml" : "f99a652d3916bc691dffab22f1b5942774f11e7e32a62acf3dd5da8e90d8042b",
+    "docs/design.md" : "c84dc61b209a3c6dc86073fb1b59ee83ced8f8f52abd6bd8c91bbc6d4507de8a"
+  },
+  "outputs" : {
+    "src/main/java/com/agentic/shortener/error/InvalidExpiryException.java" : "fffbb7e3ee9d5dfcf1d9b4af204666d339dd3104495a344192eb113d0f7c60cc",
+    "src/main/java/com/agentic/shortener/ratelimit/RateLimitFilter.java" : "37113342d73c0e852c5029e5ea8ab368330aae12d855cde5984d71566565baca",
+    "src/main/resources/application.properties" : "9836f7ffc3c1535c8747c35f8b360c8ba107b9588cf639ac99d8731e5d5efbee",
+    "src/main/java/com/agentic/shortener/ratelimit/TokenBucket.java" : "980ab19916c72975377bfb8ae12a748ddef29bb4f37ed2c347d39c46b69f43f3",
+    "src/main/java/com/agentic/shortener/api/LinkController.java" : "b8ce33f3af33c7d522f0394cf004f7e0c2fc1d3dfc4dac12548edf26caecad83",
+    "src/main/java/com/agentic/shortener/dto/LinkDtos.java" : "2b85faa9407b891f1c689e2424c277a61245e9c3f50907df373616d176e1a37f",
+    "src/main/java/com/agentic/shortener/repository/LinkRepository.java" : "265a3d128fc113a6aa89066b689ab74615bc749a4952b2d9ea4074e37f9d695b",
+    "src/main/java/com/agentic/shortener/error/GlobalExceptionHandler.java" : "ddc955c89ebe50ad11a96b559ca60eef401a3e67ff9b5b6cfd2cd063062e2e62",
+    "src/main/java/com/agentic/shortener/model/Link.java" : "de6d06fad7ff0ab8d824dc88be8c27e200227030584c63bf81dc97cdcdc8fe15",
+    "src/main/java/com/agentic/shortener/error/LinkExpiredException.java" : "9774aa69311a0730fe52959f15e4a7b564c31171efb0c1d1bb8c8a75b3659462",
+    "src/main/java/com/agentic/shortener/service/LinkService.java" : "3e2d921910681aacacb0b5698b9ffdaedcd2f7f8fd09a17efe80a20da71dcca8"
+  },
+  "at" : "2026-10-15T08:25:22.727826311Z"
+}, {
+  "id" : "D-9",
+  "node" : "design",
+  "actor" : "requester",
+  "decision" : "requirement-changed",
+  "rationale" : "Clients must know when to retry: document the Retry-After header on 429 responses in the API contract.",
+  "inputs" : { },
+  "outputs" : { },
+  "at" : "2026-10-15T08:25:22.787139818Z"
+}, {
+  "id" : "D-10",
+  "node" : "design",
+  "actor" : "architect",
+  "decision" : "completed",
+  "rationale" : "contract-first: the OpenAPI file is the reviewed artefact that the implementation must follow",
+  "inputs" : {
+    "docs/impact-analysis.md" : "368b765b61df95836d099e6acd86afde609e07d88c2de8ece0c21afec7d5cd30",
+    "docs/requirements.md" : "9bfee3ea06bb55d9463c52b17eafe7ea121abb7f9958c35cc80790084f91547d"
+  },
+  "outputs" : {
+    "docs/design.md" : "313b95483ada4d9ad27df38028c62e807053410cc5885800e3461de8c397a2b4",
+    "openapi.yaml" : "f99a652d3916bc691dffab22f1b5942774f11e7e32a62acf3dd5da8e90d8042b"
+  },
+  "at" : "2026-10-15T08:25:22.793795207Z"
+}, {
+  "id" : "D-11",
+  "node" : "design",
+  "actor" : "human:simulated-reviewer",
+  "decision" : "approved",
+  "rationale" : "reviewed and approved (simulated)",
+  "inputs" : {
+    "docs/impact-analysis.md" : "368b765b61df95836d099e6acd86afde609e07d88c2de8ece0c21afec7d5cd30",
+    "docs/requirements.md" : "9bfee3ea06bb55d9463c52b17eafe7ea121abb7f9958c35cc80790084f91547d"
+  },
+  "outputs" : {
+    "docs/design.md" : "313b95483ada4d9ad27df38028c62e807053410cc5885800e3461de8c397a2b4",
+    "openapi.yaml" : "f99a652d3916bc691dffab22f1b5942774f11e7e32a62acf3dd5da8e90d8042b"
+  },
+  "at" : "2026-10-15T08:25:22.794036062Z"
+}, {
+  "id" : "D-12",
+  "node" : "migration",
+  "actor" : "golden-developer",
+  "decision" : "completed",
+  "rationale" : "deterministic change set; the need for it was established by the impact analysis",
+  "inputs" : {
+    "docs/design.md" : "313b95483ada4d9ad27df38028c62e807053410cc5885800e3461de8c397a2b4",
+    "openapi.yaml" : "f99a652d3916bc691dffab22f1b5942774f11e7e32a62acf3dd5da8e90d8042b"
+  },
+  "outputs" : {
+    "src/main/resources/db/migration/V2__add_link_expiry.sql" : "dfe2cc50403f2b72945eb0a68e229a7ac7d2842ec0ca91010874e9a63ac095c3"
+  },
+  "at" : "2026-10-15T08:25:22.832933261Z"
+}, {
+  "id" : "D-13",
+  "node" : "migration",
+  "actor" : "human:simulated-reviewer",
+  "decision" : "approved",
+  "rationale" : "reviewed and approved (simulated)",
+  "inputs" : {
+    "docs/design.md" : "313b95483ada4d9ad27df38028c62e807053410cc5885800e3461de8c397a2b4",
+    "openapi.yaml" : "f99a652d3916bc691dffab22f1b5942774f11e7e32a62acf3dd5da8e90d8042b"
+  },
+  "outputs" : {
+    "src/main/resources/db/migration/V2__add_link_expiry.sql" : "dfe2cc50403f2b72945eb0a68e229a7ac7d2842ec0ca91010874e9a63ac095c3"
+  },
+  "at" : "2026-10-15T08:25:22.833160613Z"
+}, {
+  "id" : "D-14",
+  "node" : "implement",
+  "actor" : "developer",
+  "decision" : "completed",
+  "rationale" : "retry with feedback from the previous failure",
+  "inputs" : {
+    "src/main/resources/db/migration/V2__add_link_expiry.sql" : "dfe2cc50403f2b72945eb0a68e229a7ac7d2842ec0ca91010874e9a63ac095c3",
+    "openapi.yaml" : "f99a652d3916bc691dffab22f1b5942774f11e7e32a62acf3dd5da8e90d8042b",
+    "docs/design.md" : "313b95483ada4d9ad27df38028c62e807053410cc5885800e3461de8c397a2b4"
+  },
+  "outputs" : {
+    "src/main/java/com/agentic/shortener/error/InvalidExpiryException.java" : "fffbb7e3ee9d5dfcf1d9b4af204666d339dd3104495a344192eb113d0f7c60cc",
+    "src/main/java/com/agentic/shortener/ratelimit/RateLimitFilter.java" : "37113342d73c0e852c5029e5ea8ab368330aae12d855cde5984d71566565baca",
+    "src/main/resources/application.properties" : "9836f7ffc3c1535c8747c35f8b360c8ba107b9588cf639ac99d8731e5d5efbee",
+    "src/main/java/com/agentic/shortener/ratelimit/TokenBucket.java" : "980ab19916c72975377bfb8ae12a748ddef29bb4f37ed2c347d39c46b69f43f3",
+    "src/main/java/com/agentic/shortener/api/LinkController.java" : "b8ce33f3af33c7d522f0394cf004f7e0c2fc1d3dfc4dac12548edf26caecad83",
+    "src/main/java/com/agentic/shortener/dto/LinkDtos.java" : "2b85faa9407b891f1c689e2424c277a61245e9c3f50907df373616d176e1a37f",
+    "src/main/java/com/agentic/shortener/repository/LinkRepository.java" : "265a3d128fc113a6aa89066b689ab74615bc749a4952b2d9ea4074e37f9d695b",
+    "src/main/java/com/agentic/shortener/error/GlobalExceptionHandler.java" : "ddc955c89ebe50ad11a96b559ca60eef401a3e67ff9b5b6cfd2cd063062e2e62",
+    "src/main/java/com/agentic/shortener/model/Link.java" : "de6d06fad7ff0ab8d824dc88be8c27e200227030584c63bf81dc97cdcdc8fe15",
+    "src/main/java/com/agentic/shortener/error/LinkExpiredException.java" : "9774aa69311a0730fe52959f15e4a7b564c31171efb0c1d1bb8c8a75b3659462",
+    "src/main/java/com/agentic/shortener/service/LinkService.java" : "3e2d921910681aacacb0b5698b9ffdaedcd2f7f8fd09a17efe80a20da71dcca8"
+  },
+  "at" : "2026-10-15T08:25:22.879212550Z"
+}, {
+  "id" : "D-15",
+  "node" : "tests",
+  "actor" : "test",
+  "decision" : "completed",
+  "rationale" : "the result is recorded in the run context; the exit gate, not the agent, decides acceptance",
+  "inputs" : {
+    "docs/test-plan.md" : "594d95369843c681e0c8f8d22b73a93cfd16504bd4b43d14f128bf7dcc8e7d3c",
+    "src/main/java/com/agentic/shortener/api/LinkController.java" : "b8ce33f3af33c7d522f0394cf004f7e0c2fc1d3dfc4dac12548edf26caecad83",
+    "src/main/java/com/agentic/shortener/ratelimit/RateLimitFilter.java" : "37113342d73c0e852c5029e5ea8ab368330aae12d855cde5984d71566565baca",
+    "src/main/java/com/agentic/shortener/error/GlobalExceptionHandler.java" : "ddc955c89ebe50ad11a96b559ca60eef401a3e67ff9b5b6cfd2cd063062e2e62",
+    "src/main/java/com/agentic/shortener/dto/LinkDtos.java" : "2b85faa9407b891f1c689e2424c277a61245e9c3f50907df373616d176e1a37f",
+    "src/main/java/com/agentic/shortener/repository/LinkRepository.java" : "265a3d128fc113a6aa89066b689ab74615bc749a4952b2d9ea4074e37f9d695b",
+    "src/main/resources/application.properties" : "9836f7ffc3c1535c8747c35f8b360c8ba107b9588cf639ac99d8731e5d5efbee",
+    "src/main/java/com/agentic/shortener/ratelimit/TokenBucket.java" : "980ab19916c72975377bfb8ae12a748ddef29bb4f37ed2c347d39c46b69f43f3",
+    "src/main/java/com/agentic/shortener/service/LinkService.java" : "3e2d921910681aacacb0b5698b9ffdaedcd2f7f8fd09a17efe80a20da71dcca8",
+    "src/main/java/com/agentic/shortener/model/Link.java" : "de6d06fad7ff0ab8d824dc88be8c27e200227030584c63bf81dc97cdcdc8fe15",
+    "src/main/java/com/agentic/shortener/error/LinkExpiredException.java" : "9774aa69311a0730fe52959f15e4a7b564c31171efb0c1d1bb8c8a75b3659462",
+    "src/main/java/com/agentic/shortener/error/InvalidExpiryException.java" : "fffbb7e3ee9d5dfcf1d9b4af204666d339dd3104495a344192eb113d0f7c60cc"
+  },
+  "outputs" : {
+    "src/test/java/com/agentic/shortener/api/RateLimitApiTest.java" : "c2a56344dc987bfafe61f95a4cef44e68ddd1b9f22ee00cbc3590dd20f73b1fa",
+    "src/test/java/com/agentic/shortener/validation/UrlValidatorTest.java" : "283c1580a9035b92ecd648620f99218027cf26b977df8ab1c168d88a5105eced",
+    "src/test/java/com/agentic/shortener/api/LinkApiTest.java" : "1c6889128a7326bc57895dc294c271c6e982afff2a02db61482887d4cb1d0f61",
+    "src/test/java/com/agentic/shortener/api/LinkExpiryApiTest.java" : "1c389f70eff8e769dc212e63b91f37f5d4cb872133e7b1b65403d04271c83ee7",
+    "src/test/java/com/agentic/shortener/service/CodeGeneratorTest.java" : "e73a4bd617bebb873b53829a3807eb0b5f46b8d2cb7f02d00c45b23ad46fb4aa",
+    "src/test/java/com/agentic/shortener/ratelimit/TokenBucketTest.java" : "605ba14e38af1db77f2719748eeaaa32d032ca18787e1efcc5e7c1f4d8e75e2f",
+    "docs/test-report.md" : "99faa9f6e15ad5dd7249335ac984b086f6e933c05fb9898ab7d4584dcff10bd9"
+  },
+  "at" : "2026-10-15T08:25:22.929616394Z"
+}, {
+  "id" : "D-16",
+  "node" : "security",
+  "actor" : "security",
+  "decision" : "completed",
+  "rationale" : "blocking findings fail the node; the agent cannot waive them",
+  "inputs" : {
+    "src/test/java/com/agentic/shortener/api/RateLimitApiTest.java" : "c2a56344dc987bfafe61f95a4cef44e68ddd1b9f22ee00cbc3590dd20f73b1fa",
+    "docs/test-report.md" : "99faa9f6e15ad5dd7249335ac984b086f6e933c05fb9898ab7d4584dcff10bd9",
+    "src/test/java/com/agentic/shortener/api/LinkApiTest.java" : "1c6889128a7326bc57895dc294c271c6e982afff2a02db61482887d4cb1d0f61",
+    "src/test/java/com/agentic/shortener/api/LinkExpiryApiTest.java" : "1c389f70eff8e769dc212e63b91f37f5d4cb872133e7b1b65403d04271c83ee7",
+    "src/test/java/com/agentic/shortener/service/CodeGeneratorTest.java" : "e73a4bd617bebb873b53829a3807eb0b5f46b8d2cb7f02d00c45b23ad46fb4aa",
+    "src/test/java/com/agentic/shortener/ratelimit/TokenBucketTest.java" : "605ba14e38af1db77f2719748eeaaa32d032ca18787e1efcc5e7c1f4d8e75e2f",
+    "src/test/java/com/agentic/shortener/validation/UrlValidatorTest.java" : "283c1580a9035b92ecd648620f99218027cf26b977df8ab1c168d88a5105eced"
+  },
+  "outputs" : {
+    "docs/security-review.md" : "45f5e6a5491debe7f4b4db14f27c3a2209c409c41859580000d48bc1a5799fec"
+  },
+  "at" : "2026-10-15T08:25:23.065296834Z"
+}, {
+  "id" : "D-17",
+  "node" : "docs",
+  "actor" : "docs",
+  "decision" : "completed",
+  "rationale" : "documentation is derived from the code so it cannot drift from the implementation",
+  "inputs" : {
+    "src/test/java/com/agentic/shortener/api/RateLimitApiTest.java" : "c2a56344dc987bfafe61f95a4cef44e68ddd1b9f22ee00cbc3590dd20f73b1fa",
+    "docs/test-report.md" : "99faa9f6e15ad5dd7249335ac984b086f6e933c05fb9898ab7d4584dcff10bd9",
+    "src/test/java/com/agentic/shortener/api/LinkApiTest.java" : "1c6889128a7326bc57895dc294c271c6e982afff2a02db61482887d4cb1d0f61",
+    "src/test/java/com/agentic/shortener/api/LinkExpiryApiTest.java" : "1c389f70eff8e769dc212e63b91f37f5d4cb872133e7b1b65403d04271c83ee7",
+    "src/test/java/com/agentic/shortener/service/CodeGeneratorTest.java" : "e73a4bd617bebb873b53829a3807eb0b5f46b8d2cb7f02d00c45b23ad46fb4aa",
+    "src/test/java/com/agentic/shortener/ratelimit/TokenBucketTest.java" : "605ba14e38af1db77f2719748eeaaa32d032ca18787e1efcc5e7c1f4d8e75e2f",
+    "src/test/java/com/agentic/shortener/validation/UrlValidatorTest.java" : "283c1580a9035b92ecd648620f99218027cf26b977df8ab1c168d88a5105eced"
+  },
+  "outputs" : {
+    "README.md" : "d63961feabac0b17a9963b313719f169641727a8d29be4c81fbddf40954f9da6",
+    "docs/CHANGELOG.md" : "a353d522d35a8f32d2ca5321ecfe56148ca86a2abd2e927cd280e510008eaa16"
+  },
+  "at" : "2026-10-15T08:25:23.213593166Z"
+}, {
+  "id" : "D-18",
+  "node" : "release",
+  "actor" : "release",
+  "decision" : "completed",
+  "rationale" : "release is blocked unless every check passes; the human approves afterwards",
+  "inputs" : {
+    "docs/CHANGELOG.md" : "a353d522d35a8f32d2ca5321ecfe56148ca86a2abd2e927cd280e510008eaa16",
+    "docs/security-review.md" : "45f5e6a5491debe7f4b4db14f27c3a2209c409c41859580000d48bc1a5799fec",
+    "README.md" : "d63961feabac0b17a9963b313719f169641727a8d29be4c81fbddf40954f9da6"
+  },
+  "outputs" : {
+    "docs/release-notes.md" : "177bb448d8914bdd6de541759c1ef6c281e6e7c4fd44af28c2738e2ede2bb9b3"
+  },
+  "at" : "2026-10-15T08:25:23.254858088Z"
+}, {
+  "id" : "D-19",
+  "node" : "release",
+  "actor" : "human:simulated-reviewer",
+  "decision" : "approved",
+  "rationale" : "reviewed and approved (simulated)",
+  "inputs" : {
+    "docs/CHANGELOG.md" : "a353d522d35a8f32d2ca5321ecfe56148ca86a2abd2e927cd280e510008eaa16",
+    "docs/security-review.md" : "45f5e6a5491debe7f4b4db14f27c3a2209c409c41859580000d48bc1a5799fec",
+    "README.md" : "d63961feabac0b17a9963b313719f169641727a8d29be4c81fbddf40954f9da6"
+  },
+  "outputs" : {
+    "docs/release-notes.md" : "177bb448d8914bdd6de541759c1ef6c281e6e7c4fd44af28c2738e2ede2bb9b3"
+  },
+  "at" : "2026-10-15T08:25:23.255273986Z"
+}, {
+  "id" : "D-20",
+  "node" : "signoff",
+  "actor" : "reviewer",
+  "decision" : "completed",
+  "rationale" : "the reviewer only summarises recorded facts; it does not approve its own work",
+  "inputs" : {
+    "docs/release-notes.md" : "177bb448d8914bdd6de541759c1ef6c281e6e7c4fd44af28c2738e2ede2bb9b3"
+  },
+  "outputs" : {
+    "docs/engineering-summary.md" : "bb59f4bacb5422d5623e0f00f2b4e0cc475b26215a57d148b6327d4cb931d6da"
+  },
+  "at" : "2026-10-15T08:25:23.301714939Z"
+}, {
+  "id" : "D-21",
+  "node" : "signoff",
+  "actor" : "human:simulated-reviewer",
+  "decision" : "approved",
+  "rationale" : "reviewed and approved (simulated)",
+  "inputs" : {
+    "docs/release-notes.md" : "177bb448d8914bdd6de541759c1ef6c281e6e7c4fd44af28c2738e2ede2bb9b3"
+  },
+  "outputs" : {
+    "docs/engineering-summary.md" : "bb59f4bacb5422d5623e0f00f2b4e0cc475b26215a57d148b6327d4cb931d6da"
+  },
+  "at" : "2026-10-15T08:25:23.302010573Z"
+} ]

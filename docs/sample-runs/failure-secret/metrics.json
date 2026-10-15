@@ -1,0 +1,14 @@
+{
+  "status" : "STOPPED",
+  "totalNodes" : 9,
+  "doneNodes" : 3,
+  "firstAttemptSuccessRate" : 1.0,
+  "retries" : 0,
+  "rollbacks" : 1,
+  "fallbacks" : 0,
+  "safeStops" : 1,
+  "replans" : 0,
+  "approvals" : 1,
+  "avgMttrMillis" : 0.0,
+  "endToEndMillis" : 286
+}

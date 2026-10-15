@@ -1,0 +1,2242 @@
+{
+  "info": {
+    "_postman_id": "35d2acc2-5365-5b3b-8ae1-0b84d00333c9",
+    "name": "Agentic SDLC Orchestrator",
+    "description": "End-to-end API tests for the orchestrator. Run the whole collection with the Collection Runner (it approves checkpoints and polls by itself), or click through a folder by hand. See docs/postman-testing.md.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "0. Smoke - is the server up?",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/actuator/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"UP\", () => pm.expect(pm.response.json().status).to.eql(\"UP\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List runs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"is a list\", () => pm.expect(pm.response.json()).to.be.an(\"array\"));",
+                  "const active = pm.response.json().filter(r => r.metrics.status === \"RUNNING\");",
+                  "pm.test(\"no run is active (otherwise new runs get 409)\", () => pm.expect(active.map(r => r.runId)).to.eql([]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Greenfield - you approve every checkpoint",
+      "description": "Builds the URL shortener from an empty folder. Pauses at design, release and signoff for you.",
+      "item": [
+        {
+          "name": "GF \u00b7 Start run",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scenario\": \"GREENFIELD\",\n  \"label\": \"postman-greenfield\",\n  \"requirement\": \"Build a URL shortener service that creates short links, redirects visitors to the original URL and reports click statistics.\",\n  \"autoApprove\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"run accepted (202)\", () => pm.response.to.have.status(202));",
+                  "if (pm.response.code === 409) {",
+                  "    console.warn(\"Another run is still active. Stop it (Operator controls) or wait for it to finish.\");",
+                  "}",
+                  "const body = pm.response.json();",
+                  "pm.test(\"runId returned\", () => pm.expect(body.runId).to.match(/^run-/));",
+                  "pm.collectionVariables.set(\"runId\", body.runId);",
+                  "pm.collectionVariables.set(\"polls\", 0);",
+                  "const sent = JSON.parse(pm.request.body.raw.replace(/{{requirement}}/g, JSON.stringify(pm.collectionVariables.get(\"requirement\")).slice(1, -1)));",
+                  "if (sent.requirement) { pm.collectionVariables.set(\"requirement\", sent.requirement); }",
+                  "pm.collectionVariables.set(\"rejectNodeOnce\", \"\");",
+                  "pm.collectionVariables.set(\"rejectedAlready\", \"\");",
+                  "pm.collectionVariables.set(\"clarificationAnswers\", '{}');",
+                  "console.log(\"Started \" + body.runId);",
+                  "next(\"GF \u00b7 Wait for checkpoint\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GF \u00b7 Wait for checkpoint",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/pending",
+            "description": "Polls until a human checkpoint is waiting or the run has finished. Manual mode: click Send until a checkpoint appears, then send 'Decide checkpoint'."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"pending list returned\", () => pm.response.to.have.status(200));",
+                  "const pending = pm.response.json();",
+                  "const polls = Number(pm.collectionVariables.get(\"polls\") || 0);",
+                  "const maxPolls = Number(pm.collectionVariables.get(\"maxPolls\") || 300);",
+                  "const delay = Number(pm.collectionVariables.get(\"pollDelayMs\") || 2000);",
+                  "if (pending.length > 0) {",
+                  "    const p = pending[0];",
+                  "    pm.collectionVariables.set(\"nodeId\", p.nodeId);",
+                  "    pm.collectionVariables.set(\"checkpointKind\", p.kind);",
+                  "    pm.collectionVariables.set(\"polls\", 0);",
+                  "    console.log(\"Human needed at '\" + p.nodeId + \"' (\" + p.kind + \"): \" + p.summary);",
+                  "    next(\"GF \u00b7 Decide checkpoint\");",
+                  "} else {",
+                  "    pm.sendRequest(pm.collectionVariables.get(\"baseUrl\") + \"/runs/\" + pm.collectionVariables.get(\"runId\"), (err, res) => {",
+                  "        const status = err ? \"UNKNOWN\" : res.json().metrics.status;",
+                  "        if (status === \"COMPLETED\" || status === \"STOPPED\") {",
+                  "            console.log(\"Run finished: \" + status);",
+                  "            pm.collectionVariables.set(\"polls\", 0);",
+                  "            next(\"GF \u00b7 Verify outcome\");",
+                  "        } else if (polls >= maxPolls) {",
+                  "            pm.test(\"run finished within \" + maxPolls + \" polls\", () => pm.expect.fail(\"still \" + status));",
+                  "            next(null);",
+                  "        } else {",
+                  "            pm.collectionVariables.set(\"polls\", polls + 1);",
+                  "            console.log(\"Still \" + status + \", no checkpoint yet (poll \" + (polls + 1) + \"). In manual mode: click Send again.\");",
+                  "            setTimeout(() => next(\"GF \u00b7 Wait for checkpoint\"), delay);",
+                  "        }",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GF \u00b7 Decide checkpoint",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs/{{runId}}/nodes/{{nodeId}}/approval",
+            "description": "Approves (or answers) the checkpoint found by 'Wait for checkpoint'.",
+            "body": {
+              "mode": "raw",
+              "raw": "{{decisionBody}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Builds the decision for whatever checkpoint 'Wait for checkpoint' found.",
+                  "const node = pm.collectionVariables.get(\"nodeId\");",
+                  "const kind = pm.collectionVariables.get(\"checkpointKind\");",
+                  "const approver = pm.collectionVariables.get(\"approver\") || \"tester\";",
+                  "let decision;",
+                  "if (kind === \"CLARIFICATION\") {",
+                  "    const answers = JSON.parse(pm.collectionVariables.get(\"clarificationAnswers\") || \"{}\");",
+                  "    decision = { approved: true, approver: approver, comment: \"scope confirmed from Postman\", answers: answers };",
+                  "} else if (node === pm.collectionVariables.get(\"rejectNodeOnce\") && !pm.collectionVariables.get(\"rejectedAlready\")) {",
+                  "    pm.collectionVariables.set(\"rejectedAlready\", \"yes\");",
+                  "    decision = { approved: false, approver: approver, comment: \"Rejected once from Postman: please also describe pagination of the stats endpoint.\" };",
+                  "} else {",
+                  "    decision = { approved: true, approver: approver, comment: \"approved from Postman\" };",
+                  "}",
+                  "pm.collectionVariables.set(\"decisionBody\", JSON.stringify(decision));",
+                  "console.log(\"Deciding '\" + node + \"': \" + JSON.stringify(decision));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"decision delivered (204)\", () => pm.response.to.have.status(204));",
+                  "next(\"GF \u00b7 Wait for checkpoint\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GF \u00b7 Verify outcome",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"run info returned\", () => pm.response.to.have.status(200));",
+                  "const info = pm.response.json();",
+                  "const m = info.metrics;",
+                  "const nodes = info.nodes;",
+                  "const ids = nodes.map(n => n.id);",
+                  "console.log(\"Outcome: \" + JSON.stringify(m));",
+                  "pm.test(\"status COMPLETED\", () => { pm.expect(m.status).to.eql(\"COMPLETED\"); });",
+                  "pm.test(\"all 9 nodes done\", () => { pm.expect(m.doneNodes).to.eql(9); pm.expect(m.totalNodes).to.eql(9); });",
+                  "pm.test(\"3 human approvals (design, release, signoff)\", () => { pm.expect(m.approvals).to.eql(3); });",
+                  "pm.test(\"no safe-stop\", () => { pm.expect(m.safeStops).to.eql(0); });",
+                  "pm.test(\"design and test-plan both depend only on requirements (parallel branch)\", () => { const d = nodes.find(n => n.id === \"design\"); const t = nodes.find(n => n.id === \"test-plan\"); pm.expect(d.dependsOn).to.eql([\"requirements\"]); pm.expect(t.dependsOn).to.eql([\"requirements\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GF \u00b7 Audit trail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/events"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"events returned\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"audit hash chain verifies\", () => pm.expect(body.chainVerified).to.be.true);",
+                  "pm.test(\"run started and finished events present\", () => {",
+                  "    const types = body.events.map(e => e.type);",
+                  "    pm.expect(types).to.include(\"RUN_STARTED\");",
+                  "    pm.expect(types).to.include(\"RUN_FINISHED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GF \u00b7 Graph",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/graph"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"graph returned\", () => pm.response.to.have.status(200));",
+                  "const g = pm.response.json();",
+                  "pm.test(\"every node DONE\", () => g.forEach(n => pm.expect(n.state, n.id).to.eql(\"DONE\")));",
+                  "pm.test(\"HIGH-risk nodes are the approval points\", () => {",
+                  "    const high = g.filter(n => n.risk === \"HIGH\").map(n => n.id).sort();",
+                  "    pm.expect(high).to.eql([\"design\", \"release\", \"signoff\"]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GF \u00b7 Lineage of docs/design.md",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/lineage?path=docs/design.md"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"lineage returned\", () => pm.response.to.have.status(200));",
+                  "const t = pm.response.json();",
+                  "pm.test(\"produced by the design node\", () => pm.expect(t.producerNode).to.eql(\"design\"));",
+                  "pm.test(\"content hash recorded\", () => pm.expect(t.sha256).to.match(/^[0-9a-f]{64}$/));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GF \u00b7 Report (Markdown)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/report"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"report returned\", () => pm.response.to.have.status(200));",
+                  "const req = pm.collectionVariables.get(\"requirement\");",
+                  "pm.test(\"report shows the requirement that was submitted\", () => pm.expect(pm.response.text()).to.include(req));",
+                  "pm.test(\"report says COMPLETED\", () => pm.expect(pm.response.text()).to.include(\"COMPLETED\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1b. Greenfield - your own requirement",
+      "description": "Give your own requirement: edit the collection variable 'requirement' (or the body of Start run). It is recorded in docs/requirements.md and the report. Without an ANTHROPIC_API_KEY the code built is still the reference URL shortener; keywords such as 'expiry' or 'rate limit' add requirements (FR-5, FR-6).",
+      "item": [
+        {
+          "name": "CR \u00b7 Start run",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scenario\": \"GREENFIELD\",\n  \"label\": \"postman-my-requirement\",\n  \"requirement\": \"{{requirement}}\",\n  \"autoApprove\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"run accepted (202)\", () => pm.response.to.have.status(202));",
+                  "if (pm.response.code === 409) {",
+                  "    console.warn(\"Another run is still active. Stop it (Operator controls) or wait for it to finish.\");",
+                  "}",
+                  "const body = pm.response.json();",
+                  "pm.test(\"runId returned\", () => pm.expect(body.runId).to.match(/^run-/));",
+                  "pm.collectionVariables.set(\"runId\", body.runId);",
+                  "pm.collectionVariables.set(\"polls\", 0);",
+                  "const sent = JSON.parse(pm.request.body.raw.replace(/{{requirement}}/g, JSON.stringify(pm.collectionVariables.get(\"requirement\")).slice(1, -1)));",
+                  "if (sent.requirement) { pm.collectionVariables.set(\"requirement\", sent.requirement); }",
+                  "pm.collectionVariables.set(\"rejectNodeOnce\", \"\");",
+                  "pm.collectionVariables.set(\"rejectedAlready\", \"\");",
+                  "pm.collectionVariables.set(\"clarificationAnswers\", '{}');",
+                  "console.log(\"Started \" + body.runId);",
+                  "next(\"CR \u00b7 Wait for checkpoint\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CR \u00b7 Wait for checkpoint",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/pending",
+            "description": "Polls until a human checkpoint is waiting or the run has finished. Manual mode: click Send until a checkpoint appears, then send 'Decide checkpoint'."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"pending list returned\", () => pm.response.to.have.status(200));",
+                  "const pending = pm.response.json();",
+                  "const polls = Number(pm.collectionVariables.get(\"polls\") || 0);",
+                  "const maxPolls = Number(pm.collectionVariables.get(\"maxPolls\") || 300);",
+                  "const delay = Number(pm.collectionVariables.get(\"pollDelayMs\") || 2000);",
+                  "if (pending.length > 0) {",
+                  "    const p = pending[0];",
+                  "    pm.collectionVariables.set(\"nodeId\", p.nodeId);",
+                  "    pm.collectionVariables.set(\"checkpointKind\", p.kind);",
+                  "    pm.collectionVariables.set(\"polls\", 0);",
+                  "    console.log(\"Human needed at '\" + p.nodeId + \"' (\" + p.kind + \"): \" + p.summary);",
+                  "    next(\"CR \u00b7 Decide checkpoint\");",
+                  "} else {",
+                  "    pm.sendRequest(pm.collectionVariables.get(\"baseUrl\") + \"/runs/\" + pm.collectionVariables.get(\"runId\"), (err, res) => {",
+                  "        const status = err ? \"UNKNOWN\" : res.json().metrics.status;",
+                  "        if (status === \"COMPLETED\" || status === \"STOPPED\") {",
+                  "            console.log(\"Run finished: \" + status);",
+                  "            pm.collectionVariables.set(\"polls\", 0);",
+                  "            next(\"CR \u00b7 Verify outcome\");",
+                  "        } else if (polls >= maxPolls) {",
+                  "            pm.test(\"run finished within \" + maxPolls + \" polls\", () => pm.expect.fail(\"still \" + status));",
+                  "            next(null);",
+                  "        } else {",
+                  "            pm.collectionVariables.set(\"polls\", polls + 1);",
+                  "            console.log(\"Still \" + status + \", no checkpoint yet (poll \" + (polls + 1) + \"). In manual mode: click Send again.\");",
+                  "            setTimeout(() => next(\"CR \u00b7 Wait for checkpoint\"), delay);",
+                  "        }",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CR \u00b7 Decide checkpoint",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs/{{runId}}/nodes/{{nodeId}}/approval",
+            "description": "Approves (or answers) the checkpoint found by 'Wait for checkpoint'.",
+            "body": {
+              "mode": "raw",
+              "raw": "{{decisionBody}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Builds the decision for whatever checkpoint 'Wait for checkpoint' found.",
+                  "const node = pm.collectionVariables.get(\"nodeId\");",
+                  "const kind = pm.collectionVariables.get(\"checkpointKind\");",
+                  "const approver = pm.collectionVariables.get(\"approver\") || \"tester\";",
+                  "let decision;",
+                  "if (kind === \"CLARIFICATION\") {",
+                  "    const answers = JSON.parse(pm.collectionVariables.get(\"clarificationAnswers\") || \"{}\");",
+                  "    decision = { approved: true, approver: approver, comment: \"scope confirmed from Postman\", answers: answers };",
+                  "} else if (node === pm.collectionVariables.get(\"rejectNodeOnce\") && !pm.collectionVariables.get(\"rejectedAlready\")) {",
+                  "    pm.collectionVariables.set(\"rejectedAlready\", \"yes\");",
+                  "    decision = { approved: false, approver: approver, comment: \"Rejected once from Postman: please also describe pagination of the stats endpoint.\" };",
+                  "} else {",
+                  "    decision = { approved: true, approver: approver, comment: \"approved from Postman\" };",
+                  "}",
+                  "pm.collectionVariables.set(\"decisionBody\", JSON.stringify(decision));",
+                  "console.log(\"Deciding '\" + node + \"': \" + JSON.stringify(decision));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"decision delivered (204)\", () => pm.response.to.have.status(204));",
+                  "next(\"CR \u00b7 Wait for checkpoint\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CR \u00b7 Verify outcome",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"run info returned\", () => pm.response.to.have.status(200));",
+                  "const info = pm.response.json();",
+                  "const m = info.metrics;",
+                  "const nodes = info.nodes;",
+                  "const ids = nodes.map(n => n.id);",
+                  "console.log(\"Outcome: \" + JSON.stringify(m));",
+                  "pm.test(\"status COMPLETED\", () => { pm.expect(m.status).to.eql(\"COMPLETED\"); });",
+                  "pm.test(\"all nodes done\", () => { pm.expect(m.doneNodes).to.eql(m.totalNodes); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CR \u00b7 Audit trail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/events"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"events returned\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"audit hash chain verifies\", () => pm.expect(body.chainVerified).to.be.true);",
+                  "pm.test(\"run started and finished events present\", () => {",
+                  "    const types = body.events.map(e => e.type);",
+                  "    pm.expect(types).to.include(\"RUN_STARTED\");",
+                  "    pm.expect(types).to.include(\"RUN_FINISHED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CR \u00b7 Report shows your requirement",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/report"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"report returned\", () => pm.response.to.have.status(200));",
+                  "const req = pm.collectionVariables.get(\"requirement\");",
+                  "pm.test(\"report shows the requirement that was submitted\", () => pm.expect(pm.response.text()).to.include(req));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Greenfield - reject the design once",
+      "description": "You reject the design with a comment; the design is reworked and asked again, then approved.",
+      "item": [
+        {
+          "name": "RJ \u00b7 Start run",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scenario\": \"GREENFIELD\",\n  \"label\": \"postman-rejection\",\n  \"requirement\": \"Build a URL shortener service that creates short links, redirects visitors to the original URL and reports click statistics.\",\n  \"autoApprove\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"run accepted (202)\", () => pm.response.to.have.status(202));",
+                  "if (pm.response.code === 409) {",
+                  "    console.warn(\"Another run is still active. Stop it (Operator controls) or wait for it to finish.\");",
+                  "}",
+                  "const body = pm.response.json();",
+                  "pm.test(\"runId returned\", () => pm.expect(body.runId).to.match(/^run-/));",
+                  "pm.collectionVariables.set(\"runId\", body.runId);",
+                  "pm.collectionVariables.set(\"polls\", 0);",
+                  "const sent = JSON.parse(pm.request.body.raw.replace(/{{requirement}}/g, JSON.stringify(pm.collectionVariables.get(\"requirement\")).slice(1, -1)));",
+                  "if (sent.requirement) { pm.collectionVariables.set(\"requirement\", sent.requirement); }",
+                  "pm.collectionVariables.set(\"rejectNodeOnce\", \"design\");",
+                  "pm.collectionVariables.set(\"rejectedAlready\", \"\");",
+                  "pm.collectionVariables.set(\"clarificationAnswers\", '{}');",
+                  "console.log(\"Started \" + body.runId);",
+                  "next(\"RJ \u00b7 Wait for checkpoint\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "RJ \u00b7 Wait for checkpoint",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/pending",
+            "description": "Polls until a human checkpoint is waiting or the run has finished. Manual mode: click Send until a checkpoint appears, then send 'Decide checkpoint'."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"pending list returned\", () => pm.response.to.have.status(200));",
+                  "const pending = pm.response.json();",
+                  "const polls = Number(pm.collectionVariables.get(\"polls\") || 0);",
+                  "const maxPolls = Number(pm.collectionVariables.get(\"maxPolls\") || 300);",
+                  "const delay = Number(pm.collectionVariables.get(\"pollDelayMs\") || 2000);",
+                  "if (pending.length > 0) {",
+                  "    const p = pending[0];",
+                  "    pm.collectionVariables.set(\"nodeId\", p.nodeId);",
+                  "    pm.collectionVariables.set(\"checkpointKind\", p.kind);",
+                  "    pm.collectionVariables.set(\"polls\", 0);",
+                  "    console.log(\"Human needed at '\" + p.nodeId + \"' (\" + p.kind + \"): \" + p.summary);",
+                  "    next(\"RJ \u00b7 Decide checkpoint\");",
+                  "} else {",
+                  "    pm.sendRequest(pm.collectionVariables.get(\"baseUrl\") + \"/runs/\" + pm.collectionVariables.get(\"runId\"), (err, res) => {",
+                  "        const status = err ? \"UNKNOWN\" : res.json().metrics.status;",
+                  "        if (status === \"COMPLETED\" || status === \"STOPPED\") {",
+                  "            console.log(\"Run finished: \" + status);",
+                  "            pm.collectionVariables.set(\"polls\", 0);",
+                  "            next(\"RJ \u00b7 Verify outcome\");",
+                  "        } else if (polls >= maxPolls) {",
+                  "            pm.test(\"run finished within \" + maxPolls + \" polls\", () => pm.expect.fail(\"still \" + status));",
+                  "            next(null);",
+                  "        } else {",
+                  "            pm.collectionVariables.set(\"polls\", polls + 1);",
+                  "            console.log(\"Still \" + status + \", no checkpoint yet (poll \" + (polls + 1) + \"). In manual mode: click Send again.\");",
+                  "            setTimeout(() => next(\"RJ \u00b7 Wait for checkpoint\"), delay);",
+                  "        }",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "RJ \u00b7 Decide checkpoint",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs/{{runId}}/nodes/{{nodeId}}/approval",
+            "description": "Approves (or answers) the checkpoint found by 'Wait for checkpoint'.",
+            "body": {
+              "mode": "raw",
+              "raw": "{{decisionBody}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Builds the decision for whatever checkpoint 'Wait for checkpoint' found.",
+                  "const node = pm.collectionVariables.get(\"nodeId\");",
+                  "const kind = pm.collectionVariables.get(\"checkpointKind\");",
+                  "const approver = pm.collectionVariables.get(\"approver\") || \"tester\";",
+                  "let decision;",
+                  "if (kind === \"CLARIFICATION\") {",
+                  "    const answers = JSON.parse(pm.collectionVariables.get(\"clarificationAnswers\") || \"{}\");",
+                  "    decision = { approved: true, approver: approver, comment: \"scope confirmed from Postman\", answers: answers };",
+                  "} else if (node === pm.collectionVariables.get(\"rejectNodeOnce\") && !pm.collectionVariables.get(\"rejectedAlready\")) {",
+                  "    pm.collectionVariables.set(\"rejectedAlready\", \"yes\");",
+                  "    decision = { approved: false, approver: approver, comment: \"Rejected once from Postman: please also describe pagination of the stats endpoint.\" };",
+                  "} else {",
+                  "    decision = { approved: true, approver: approver, comment: \"approved from Postman\" };",
+                  "}",
+                  "pm.collectionVariables.set(\"decisionBody\", JSON.stringify(decision));",
+                  "console.log(\"Deciding '\" + node + \"': \" + JSON.stringify(decision));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"decision delivered (204)\", () => pm.response.to.have.status(204));",
+                  "next(\"RJ \u00b7 Wait for checkpoint\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "RJ \u00b7 Verify outcome",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"run info returned\", () => pm.response.to.have.status(200));",
+                  "const info = pm.response.json();",
+                  "const m = info.metrics;",
+                  "const nodes = info.nodes;",
+                  "const ids = nodes.map(n => n.id);",
+                  "console.log(\"Outcome: \" + JSON.stringify(m));",
+                  "pm.test(\"status COMPLETED\", () => { pm.expect(m.status).to.eql(\"COMPLETED\"); });",
+                  "pm.test(\"design ran twice (rework after rejection)\", () => { pm.expect(nodes.find(n => n.id === \"design\").attempts).to.be.at.least(2); });",
+                  "pm.test(\"rejection caused a rollback\", () => { pm.expect(m.rollbacks).to.be.at.least(1); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "RJ \u00b7 Audit trail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/events"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"events returned\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"audit hash chain verifies\", () => pm.expect(body.chainVerified).to.be.true);",
+                  "pm.test(\"run started and finished events present\", () => {",
+                  "    const types = body.events.map(e => e.type);",
+                  "    pm.expect(types).to.include(\"RUN_STARTED\");",
+                  "    pm.expect(types).to.include(\"RUN_FINISHED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Brownfield - change existing code + mid-run requirement change",
+      "description": "Starts from the reference shortener, adds expiry and rate limiting. Impact analysis adds a migration node at run time; after 'implement' a requirement change re-runs design and everything after it, so design and migration are approved twice.",
+      "item": [
+        {
+          "name": "BF \u00b7 Start run",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scenario\": \"BROWNFIELD\",\n  \"label\": \"postman-brownfield\",\n  \"requirement\": \"Add optional link expiry and per-IP rate limiting to the existing URL shortener without breaking its current API.\",\n  \"autoApprove\": false,\n  \"change\": {\n    \"afterNode\": \"implement\",\n    \"targetNode\": \"design\",\n    \"amendment\": \"Clients must know when to retry: document the Retry-After header on 429 responses in the API contract.\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"run accepted (202)\", () => pm.response.to.have.status(202));",
+                  "if (pm.response.code === 409) {",
+                  "    console.warn(\"Another run is still active. Stop it (Operator controls) or wait for it to finish.\");",
+                  "}",
+                  "const body = pm.response.json();",
+                  "pm.test(\"runId returned\", () => pm.expect(body.runId).to.match(/^run-/));",
+                  "pm.collectionVariables.set(\"runId\", body.runId);",
+                  "pm.collectionVariables.set(\"polls\", 0);",
+                  "const sent = JSON.parse(pm.request.body.raw.replace(/{{requirement}}/g, JSON.stringify(pm.collectionVariables.get(\"requirement\")).slice(1, -1)));",
+                  "if (sent.requirement) { pm.collectionVariables.set(\"requirement\", sent.requirement); }",
+                  "pm.collectionVariables.set(\"rejectNodeOnce\", \"\");",
+                  "pm.collectionVariables.set(\"rejectedAlready\", \"\");",
+                  "pm.collectionVariables.set(\"clarificationAnswers\", '{}');",
+                  "console.log(\"Started \" + body.runId);",
+                  "next(\"BF \u00b7 Wait for checkpoint\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BF \u00b7 Wait for checkpoint",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/pending",
+            "description": "Polls until a human checkpoint is waiting or the run has finished. Manual mode: click Send until a checkpoint appears, then send 'Decide checkpoint'."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"pending list returned\", () => pm.response.to.have.status(200));",
+                  "const pending = pm.response.json();",
+                  "const polls = Number(pm.collectionVariables.get(\"polls\") || 0);",
+                  "const maxPolls = Number(pm.collectionVariables.get(\"maxPolls\") || 300);",
+                  "const delay = Number(pm.collectionVariables.get(\"pollDelayMs\") || 2000);",
+                  "if (pending.length > 0) {",
+                  "    const p = pending[0];",
+                  "    pm.collectionVariables.set(\"nodeId\", p.nodeId);",
+                  "    pm.collectionVariables.set(\"checkpointKind\", p.kind);",
+                  "    pm.collectionVariables.set(\"polls\", 0);",
+                  "    console.log(\"Human needed at '\" + p.nodeId + \"' (\" + p.kind + \"): \" + p.summary);",
+                  "    next(\"BF \u00b7 Decide checkpoint\");",
+                  "} else {",
+                  "    pm.sendRequest(pm.collectionVariables.get(\"baseUrl\") + \"/runs/\" + pm.collectionVariables.get(\"runId\"), (err, res) => {",
+                  "        const status = err ? \"UNKNOWN\" : res.json().metrics.status;",
+                  "        if (status === \"COMPLETED\" || status === \"STOPPED\") {",
+                  "            console.log(\"Run finished: \" + status);",
+                  "            pm.collectionVariables.set(\"polls\", 0);",
+                  "            next(\"BF \u00b7 Verify outcome\");",
+                  "        } else if (polls >= maxPolls) {",
+                  "            pm.test(\"run finished within \" + maxPolls + \" polls\", () => pm.expect.fail(\"still \" + status));",
+                  "            next(null);",
+                  "        } else {",
+                  "            pm.collectionVariables.set(\"polls\", polls + 1);",
+                  "            console.log(\"Still \" + status + \", no checkpoint yet (poll \" + (polls + 1) + \"). In manual mode: click Send again.\");",
+                  "            setTimeout(() => next(\"BF \u00b7 Wait for checkpoint\"), delay);",
+                  "        }",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BF \u00b7 Decide checkpoint",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs/{{runId}}/nodes/{{nodeId}}/approval",
+            "description": "Approves (or answers) the checkpoint found by 'Wait for checkpoint'.",
+            "body": {
+              "mode": "raw",
+              "raw": "{{decisionBody}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Builds the decision for whatever checkpoint 'Wait for checkpoint' found.",
+                  "const node = pm.collectionVariables.get(\"nodeId\");",
+                  "const kind = pm.collectionVariables.get(\"checkpointKind\");",
+                  "const approver = pm.collectionVariables.get(\"approver\") || \"tester\";",
+                  "let decision;",
+                  "if (kind === \"CLARIFICATION\") {",
+                  "    const answers = JSON.parse(pm.collectionVariables.get(\"clarificationAnswers\") || \"{}\");",
+                  "    decision = { approved: true, approver: approver, comment: \"scope confirmed from Postman\", answers: answers };",
+                  "} else if (node === pm.collectionVariables.get(\"rejectNodeOnce\") && !pm.collectionVariables.get(\"rejectedAlready\")) {",
+                  "    pm.collectionVariables.set(\"rejectedAlready\", \"yes\");",
+                  "    decision = { approved: false, approver: approver, comment: \"Rejected once from Postman: please also describe pagination of the stats endpoint.\" };",
+                  "} else {",
+                  "    decision = { approved: true, approver: approver, comment: \"approved from Postman\" };",
+                  "}",
+                  "pm.collectionVariables.set(\"decisionBody\", JSON.stringify(decision));",
+                  "console.log(\"Deciding '\" + node + \"': \" + JSON.stringify(decision));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"decision delivered (204)\", () => pm.response.to.have.status(204));",
+                  "next(\"BF \u00b7 Wait for checkpoint\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BF \u00b7 Verify outcome",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"run info returned\", () => pm.response.to.have.status(200));",
+                  "const info = pm.response.json();",
+                  "const m = info.metrics;",
+                  "const nodes = info.nodes;",
+                  "const ids = nodes.map(n => n.id);",
+                  "console.log(\"Outcome: \" + JSON.stringify(m));",
+                  "pm.test(\"status COMPLETED\", () => { pm.expect(m.status).to.eql(\"COMPLETED\"); });",
+                  "pm.test(\"migration node was added at run time\", () => { pm.expect(ids).to.include(\"migration\"); });",
+                  "pm.test(\"impact analysis node present\", () => { pm.expect(ids).to.include(\"impact\"); });",
+                  "pm.test(\"one re-plan\", () => { pm.expect(m.replans).to.eql(1); });",
+                  "pm.test(\"all nodes done\", () => { pm.expect(m.doneNodes).to.eql(m.totalNodes); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BF \u00b7 Audit trail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/events"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"events returned\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"audit hash chain verifies\", () => pm.expect(body.chainVerified).to.be.true);",
+                  "pm.test(\"run started and finished events present\", () => {",
+                  "    const types = body.events.map(e => e.type);",
+                  "    pm.expect(types).to.include(\"RUN_STARTED\");",
+                  "    pm.expect(types).to.include(\"RUN_FINISHED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Ambiguous - 'Make links safer', you choose the scope",
+      "description": "The system lists interpretations and asks you. The answers (collection variable set by Start run) confirm link-expiry and abuse-rate-limiting only; plan nodes must exist only for those.",
+      "item": [
+        {
+          "name": "AM \u00b7 Start run",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scenario\": \"AMBIGUOUS\",\n  \"label\": \"postman-ambiguous\",\n  \"requirement\": \"Make links safer.\",\n  \"autoApprove\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"run accepted (202)\", () => pm.response.to.have.status(202));",
+                  "if (pm.response.code === 409) {",
+                  "    console.warn(\"Another run is still active. Stop it (Operator controls) or wait for it to finish.\");",
+                  "}",
+                  "const body = pm.response.json();",
+                  "pm.test(\"runId returned\", () => pm.expect(body.runId).to.match(/^run-/));",
+                  "pm.collectionVariables.set(\"runId\", body.runId);",
+                  "pm.collectionVariables.set(\"polls\", 0);",
+                  "const sent = JSON.parse(pm.request.body.raw.replace(/{{requirement}}/g, JSON.stringify(pm.collectionVariables.get(\"requirement\")).slice(1, -1)));",
+                  "if (sent.requirement) { pm.collectionVariables.set(\"requirement\", sent.requirement); }",
+                  "pm.collectionVariables.set(\"rejectNodeOnce\", \"\");",
+                  "pm.collectionVariables.set(\"rejectedAlready\", \"\");",
+                  "pm.collectionVariables.set(\"clarificationAnswers\", '{\"malware-blocking\": false, \"link-expiry\": true, \"abuse-rate-limiting\": true, \"access-control\": false}');",
+                  "console.log(\"Started \" + body.runId);",
+                  "next(\"AM \u00b7 Wait for checkpoint\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "AM \u00b7 Wait for checkpoint",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/pending",
+            "description": "Polls until a human checkpoint is waiting or the run has finished. Manual mode: click Send until a checkpoint appears, then send 'Decide checkpoint'."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"pending list returned\", () => pm.response.to.have.status(200));",
+                  "const pending = pm.response.json();",
+                  "const polls = Number(pm.collectionVariables.get(\"polls\") || 0);",
+                  "const maxPolls = Number(pm.collectionVariables.get(\"maxPolls\") || 300);",
+                  "const delay = Number(pm.collectionVariables.get(\"pollDelayMs\") || 2000);",
+                  "if (pending.length > 0) {",
+                  "    const p = pending[0];",
+                  "    pm.collectionVariables.set(\"nodeId\", p.nodeId);",
+                  "    pm.collectionVariables.set(\"checkpointKind\", p.kind);",
+                  "    pm.collectionVariables.set(\"polls\", 0);",
+                  "    console.log(\"Human needed at '\" + p.nodeId + \"' (\" + p.kind + \"): \" + p.summary);",
+                  "    next(\"AM \u00b7 Decide checkpoint\");",
+                  "} else {",
+                  "    pm.sendRequest(pm.collectionVariables.get(\"baseUrl\") + \"/runs/\" + pm.collectionVariables.get(\"runId\"), (err, res) => {",
+                  "        const status = err ? \"UNKNOWN\" : res.json().metrics.status;",
+                  "        if (status === \"COMPLETED\" || status === \"STOPPED\") {",
+                  "            console.log(\"Run finished: \" + status);",
+                  "            pm.collectionVariables.set(\"polls\", 0);",
+                  "            next(\"AM \u00b7 Verify outcome\");",
+                  "        } else if (polls >= maxPolls) {",
+                  "            pm.test(\"run finished within \" + maxPolls + \" polls\", () => pm.expect.fail(\"still \" + status));",
+                  "            next(null);",
+                  "        } else {",
+                  "            pm.collectionVariables.set(\"polls\", polls + 1);",
+                  "            console.log(\"Still \" + status + \", no checkpoint yet (poll \" + (polls + 1) + \"). In manual mode: click Send again.\");",
+                  "            setTimeout(() => next(\"AM \u00b7 Wait for checkpoint\"), delay);",
+                  "        }",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "AM \u00b7 Decide checkpoint",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs/{{runId}}/nodes/{{nodeId}}/approval",
+            "description": "Approves (or answers) the checkpoint found by 'Wait for checkpoint'.",
+            "body": {
+              "mode": "raw",
+              "raw": "{{decisionBody}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Builds the decision for whatever checkpoint 'Wait for checkpoint' found.",
+                  "const node = pm.collectionVariables.get(\"nodeId\");",
+                  "const kind = pm.collectionVariables.get(\"checkpointKind\");",
+                  "const approver = pm.collectionVariables.get(\"approver\") || \"tester\";",
+                  "let decision;",
+                  "if (kind === \"CLARIFICATION\") {",
+                  "    const answers = JSON.parse(pm.collectionVariables.get(\"clarificationAnswers\") || \"{}\");",
+                  "    decision = { approved: true, approver: approver, comment: \"scope confirmed from Postman\", answers: answers };",
+                  "} else if (node === pm.collectionVariables.get(\"rejectNodeOnce\") && !pm.collectionVariables.get(\"rejectedAlready\")) {",
+                  "    pm.collectionVariables.set(\"rejectedAlready\", \"yes\");",
+                  "    decision = { approved: false, approver: approver, comment: \"Rejected once from Postman: please also describe pagination of the stats endpoint.\" };",
+                  "} else {",
+                  "    decision = { approved: true, approver: approver, comment: \"approved from Postman\" };",
+                  "}",
+                  "pm.collectionVariables.set(\"decisionBody\", JSON.stringify(decision));",
+                  "console.log(\"Deciding '\" + node + \"': \" + JSON.stringify(decision));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"decision delivered (204)\", () => pm.response.to.have.status(204));",
+                  "next(\"AM \u00b7 Wait for checkpoint\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "AM \u00b7 Verify outcome",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"run info returned\", () => pm.response.to.have.status(200));",
+                  "const info = pm.response.json();",
+                  "const m = info.metrics;",
+                  "const nodes = info.nodes;",
+                  "const ids = nodes.map(n => n.id);",
+                  "console.log(\"Outcome: \" + JSON.stringify(m));",
+                  "pm.test(\"status COMPLETED\", () => { pm.expect(m.status).to.eql(\"COMPLETED\"); });",
+                  "pm.test(\"plan nodes created for the confirmed interpretations\", () => { pm.expect(ids).to.include(\"plan-link-expiry\"); pm.expect(ids).to.include(\"plan-abuse-rate-limiting\"); });",
+                  "pm.test(\"no plan nodes for rejected interpretations\", () => { pm.expect(ids).to.not.include(\"plan-malware-blocking\"); pm.expect(ids).to.not.include(\"plan-access-control\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "AM \u00b7 Audit trail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/events"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"events returned\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"audit hash chain verifies\", () => pm.expect(body.chainVerified).to.be.true);",
+                  "pm.test(\"run started and finished events present\", () => {",
+                  "    const types = body.events.map(e => e.type);",
+                  "    pm.expect(types).to.include(\"RUN_STARTED\");",
+                  "    pm.expect(types).to.include(\"RUN_FINISHED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Failure - generated code does not compile",
+      "description": "The Developer agent writes code that does not compile. Expect retries with rollback, then the fallback agent recovers.",
+      "item": [
+        {
+          "name": "FB \u00b7 Start run",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scenario\": \"GREENFIELD\",\n  \"label\": \"postman-build-failure\",\n  \"requirement\": \"Build a URL shortener service that creates short links, redirects visitors to the original URL and reports click statistics.\",\n  \"autoApprove\": true,\n  \"fault\": \"BUILD_FAILURE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"run accepted (202)\", () => pm.response.to.have.status(202));",
+                  "if (pm.response.code === 409) {",
+                  "    console.warn(\"Another run is still active. Stop it (Operator controls) or wait for it to finish.\");",
+                  "}",
+                  "const body = pm.response.json();",
+                  "pm.test(\"runId returned\", () => pm.expect(body.runId).to.match(/^run-/));",
+                  "pm.collectionVariables.set(\"runId\", body.runId);",
+                  "pm.collectionVariables.set(\"polls\", 0);",
+                  "const sent = JSON.parse(pm.request.body.raw.replace(/{{requirement}}/g, JSON.stringify(pm.collectionVariables.get(\"requirement\")).slice(1, -1)));",
+                  "if (sent.requirement) { pm.collectionVariables.set(\"requirement\", sent.requirement); }",
+                  "pm.collectionVariables.set(\"rejectNodeOnce\", \"\");",
+                  "pm.collectionVariables.set(\"rejectedAlready\", \"\");",
+                  "pm.collectionVariables.set(\"clarificationAnswers\", '{}');",
+                  "console.log(\"Started \" + body.runId);",
+                  "next(\"FB \u00b7 Wait for checkpoint\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "FB \u00b7 Wait for checkpoint",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/pending",
+            "description": "Polls until a human checkpoint is waiting or the run has finished. Manual mode: click Send until a checkpoint appears, then send 'Decide checkpoint'."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"pending list returned\", () => pm.response.to.have.status(200));",
+                  "const pending = pm.response.json();",
+                  "const polls = Number(pm.collectionVariables.get(\"polls\") || 0);",
+                  "const maxPolls = Number(pm.collectionVariables.get(\"maxPolls\") || 300);",
+                  "const delay = Number(pm.collectionVariables.get(\"pollDelayMs\") || 2000);",
+                  "if (pending.length > 0) {",
+                  "    const p = pending[0];",
+                  "    pm.collectionVariables.set(\"nodeId\", p.nodeId);",
+                  "    pm.collectionVariables.set(\"checkpointKind\", p.kind);",
+                  "    pm.collectionVariables.set(\"polls\", 0);",
+                  "    console.log(\"Human needed at '\" + p.nodeId + \"' (\" + p.kind + \"): \" + p.summary);",
+                  "    next(\"FB \u00b7 Decide checkpoint\");",
+                  "} else {",
+                  "    pm.sendRequest(pm.collectionVariables.get(\"baseUrl\") + \"/runs/\" + pm.collectionVariables.get(\"runId\"), (err, res) => {",
+                  "        const status = err ? \"UNKNOWN\" : res.json().metrics.status;",
+                  "        if (status === \"COMPLETED\" || status === \"STOPPED\") {",
+                  "            console.log(\"Run finished: \" + status);",
+                  "            pm.collectionVariables.set(\"polls\", 0);",
+                  "            next(\"FB \u00b7 Verify outcome\");",
+                  "        } else if (polls >= maxPolls) {",
+                  "            pm.test(\"run finished within \" + maxPolls + \" polls\", () => pm.expect.fail(\"still \" + status));",
+                  "            next(null);",
+                  "        } else {",
+                  "            pm.collectionVariables.set(\"polls\", polls + 1);",
+                  "            console.log(\"Still \" + status + \", no checkpoint yet (poll \" + (polls + 1) + \"). In manual mode: click Send again.\");",
+                  "            setTimeout(() => next(\"FB \u00b7 Wait for checkpoint\"), delay);",
+                  "        }",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "FB \u00b7 Decide checkpoint",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs/{{runId}}/nodes/{{nodeId}}/approval",
+            "description": "Approves (or answers) the checkpoint found by 'Wait for checkpoint'.",
+            "body": {
+              "mode": "raw",
+              "raw": "{{decisionBody}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Builds the decision for whatever checkpoint 'Wait for checkpoint' found.",
+                  "const node = pm.collectionVariables.get(\"nodeId\");",
+                  "const kind = pm.collectionVariables.get(\"checkpointKind\");",
+                  "const approver = pm.collectionVariables.get(\"approver\") || \"tester\";",
+                  "let decision;",
+                  "if (kind === \"CLARIFICATION\") {",
+                  "    const answers = JSON.parse(pm.collectionVariables.get(\"clarificationAnswers\") || \"{}\");",
+                  "    decision = { approved: true, approver: approver, comment: \"scope confirmed from Postman\", answers: answers };",
+                  "} else if (node === pm.collectionVariables.get(\"rejectNodeOnce\") && !pm.collectionVariables.get(\"rejectedAlready\")) {",
+                  "    pm.collectionVariables.set(\"rejectedAlready\", \"yes\");",
+                  "    decision = { approved: false, approver: approver, comment: \"Rejected once from Postman: please also describe pagination of the stats endpoint.\" };",
+                  "} else {",
+                  "    decision = { approved: true, approver: approver, comment: \"approved from Postman\" };",
+                  "}",
+                  "pm.collectionVariables.set(\"decisionBody\", JSON.stringify(decision));",
+                  "console.log(\"Deciding '\" + node + \"': \" + JSON.stringify(decision));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"decision delivered (204)\", () => pm.response.to.have.status(204));",
+                  "next(\"FB \u00b7 Wait for checkpoint\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "FB \u00b7 Verify outcome",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"run info returned\", () => pm.response.to.have.status(200));",
+                  "const info = pm.response.json();",
+                  "const m = info.metrics;",
+                  "const nodes = info.nodes;",
+                  "const ids = nodes.map(n => n.id);",
+                  "console.log(\"Outcome: \" + JSON.stringify(m));",
+                  "pm.test(\"status COMPLETED (recovered)\", () => { pm.expect(m.status).to.eql(\"COMPLETED\"); });",
+                  "pm.test(\"retried\", () => { pm.expect(m.retries).to.be.at.least(1); });",
+                  "pm.test(\"rolled back\", () => { pm.expect(m.rollbacks).to.be.at.least(1); });",
+                  "pm.test(\"fallback agent used\", () => { pm.expect(m.fallbacks).to.be.at.least(1); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "FB \u00b7 Audit trail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/events"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"events returned\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"audit hash chain verifies\", () => pm.expect(body.chainVerified).to.be.true);",
+                  "pm.test(\"run started and finished events present\", () => {",
+                  "    const types = body.events.map(e => e.type);",
+                  "    pm.expect(types).to.include(\"RUN_STARTED\");",
+                  "    pm.expect(types).to.include(\"RUN_FINISHED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Failure - agent writes outside its boundary",
+      "description": "The Developer agent tries to write .github/workflows/deploy.yml. The write is denied; fallback recovers.",
+      "item": [
+        {
+          "name": "OB \u00b7 Start run",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scenario\": \"GREENFIELD\",\n  \"label\": \"postman-out-of-bounds\",\n  \"requirement\": \"Build a URL shortener service that creates short links, redirects visitors to the original URL and reports click statistics.\",\n  \"autoApprove\": true,\n  \"fault\": \"OUT_OF_BOUNDS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"run accepted (202)\", () => pm.response.to.have.status(202));",
+                  "if (pm.response.code === 409) {",
+                  "    console.warn(\"Another run is still active. Stop it (Operator controls) or wait for it to finish.\");",
+                  "}",
+                  "const body = pm.response.json();",
+                  "pm.test(\"runId returned\", () => pm.expect(body.runId).to.match(/^run-/));",
+                  "pm.collectionVariables.set(\"runId\", body.runId);",
+                  "pm.collectionVariables.set(\"polls\", 0);",
+                  "const sent = JSON.parse(pm.request.body.raw.replace(/{{requirement}}/g, JSON.stringify(pm.collectionVariables.get(\"requirement\")).slice(1, -1)));",
+                  "if (sent.requirement) { pm.collectionVariables.set(\"requirement\", sent.requirement); }",
+                  "pm.collectionVariables.set(\"rejectNodeOnce\", \"\");",
+                  "pm.collectionVariables.set(\"rejectedAlready\", \"\");",
+                  "pm.collectionVariables.set(\"clarificationAnswers\", '{}');",
+                  "console.log(\"Started \" + body.runId);",
+                  "next(\"OB \u00b7 Wait for checkpoint\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "OB \u00b7 Wait for checkpoint",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/pending",
+            "description": "Polls until a human checkpoint is waiting or the run has finished. Manual mode: click Send until a checkpoint appears, then send 'Decide checkpoint'."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"pending list returned\", () => pm.response.to.have.status(200));",
+                  "const pending = pm.response.json();",
+                  "const polls = Number(pm.collectionVariables.get(\"polls\") || 0);",
+                  "const maxPolls = Number(pm.collectionVariables.get(\"maxPolls\") || 300);",
+                  "const delay = Number(pm.collectionVariables.get(\"pollDelayMs\") || 2000);",
+                  "if (pending.length > 0) {",
+                  "    const p = pending[0];",
+                  "    pm.collectionVariables.set(\"nodeId\", p.nodeId);",
+                  "    pm.collectionVariables.set(\"checkpointKind\", p.kind);",
+                  "    pm.collectionVariables.set(\"polls\", 0);",
+                  "    console.log(\"Human needed at '\" + p.nodeId + \"' (\" + p.kind + \"): \" + p.summary);",
+                  "    next(\"OB \u00b7 Decide checkpoint\");",
+                  "} else {",
+                  "    pm.sendRequest(pm.collectionVariables.get(\"baseUrl\") + \"/runs/\" + pm.collectionVariables.get(\"runId\"), (err, res) => {",
+                  "        const status = err ? \"UNKNOWN\" : res.json().metrics.status;",
+                  "        if (status === \"COMPLETED\" || status === \"STOPPED\") {",
+                  "            console.log(\"Run finished: \" + status);",
+                  "            pm.collectionVariables.set(\"polls\", 0);",
+                  "            next(\"OB \u00b7 Verify outcome\");",
+                  "        } else if (polls >= maxPolls) {",
+                  "            pm.test(\"run finished within \" + maxPolls + \" polls\", () => pm.expect.fail(\"still \" + status));",
+                  "            next(null);",
+                  "        } else {",
+                  "            pm.collectionVariables.set(\"polls\", polls + 1);",
+                  "            console.log(\"Still \" + status + \", no checkpoint yet (poll \" + (polls + 1) + \"). In manual mode: click Send again.\");",
+                  "            setTimeout(() => next(\"OB \u00b7 Wait for checkpoint\"), delay);",
+                  "        }",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "OB \u00b7 Decide checkpoint",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs/{{runId}}/nodes/{{nodeId}}/approval",
+            "description": "Approves (or answers) the checkpoint found by 'Wait for checkpoint'.",
+            "body": {
+              "mode": "raw",
+              "raw": "{{decisionBody}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Builds the decision for whatever checkpoint 'Wait for checkpoint' found.",
+                  "const node = pm.collectionVariables.get(\"nodeId\");",
+                  "const kind = pm.collectionVariables.get(\"checkpointKind\");",
+                  "const approver = pm.collectionVariables.get(\"approver\") || \"tester\";",
+                  "let decision;",
+                  "if (kind === \"CLARIFICATION\") {",
+                  "    const answers = JSON.parse(pm.collectionVariables.get(\"clarificationAnswers\") || \"{}\");",
+                  "    decision = { approved: true, approver: approver, comment: \"scope confirmed from Postman\", answers: answers };",
+                  "} else if (node === pm.collectionVariables.get(\"rejectNodeOnce\") && !pm.collectionVariables.get(\"rejectedAlready\")) {",
+                  "    pm.collectionVariables.set(\"rejectedAlready\", \"yes\");",
+                  "    decision = { approved: false, approver: approver, comment: \"Rejected once from Postman: please also describe pagination of the stats endpoint.\" };",
+                  "} else {",
+                  "    decision = { approved: true, approver: approver, comment: \"approved from Postman\" };",
+                  "}",
+                  "pm.collectionVariables.set(\"decisionBody\", JSON.stringify(decision));",
+                  "console.log(\"Deciding '\" + node + \"': \" + JSON.stringify(decision));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"decision delivered (204)\", () => pm.response.to.have.status(204));",
+                  "next(\"OB \u00b7 Wait for checkpoint\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "OB \u00b7 Verify outcome",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"run info returned\", () => pm.response.to.have.status(200));",
+                  "const info = pm.response.json();",
+                  "const m = info.metrics;",
+                  "const nodes = info.nodes;",
+                  "const ids = nodes.map(n => n.id);",
+                  "console.log(\"Outcome: \" + JSON.stringify(m));",
+                  "pm.test(\"status COMPLETED (recovered)\", () => { pm.expect(m.status).to.eql(\"COMPLETED\"); });",
+                  "pm.test(\"fallback agent used\", () => { pm.expect(m.fallbacks).to.be.at.least(1); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "OB \u00b7 Audit trail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/events"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"events returned\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"audit hash chain verifies\", () => pm.expect(body.chainVerified).to.be.true);",
+                  "pm.test(\"run started and finished events present\", () => {",
+                  "    const types = body.events.map(e => e.type);",
+                  "    pm.expect(types).to.include(\"RUN_STARTED\");",
+                  "    pm.expect(types).to.include(\"RUN_FINISHED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. Failure - agent leaks a credential",
+      "description": "The Developer agent writes an AWS key. That is a fatal policy violation: no retries, safe-stop, workspace restored.",
+      "item": [
+        {
+          "name": "SL \u00b7 Start run",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scenario\": \"GREENFIELD\",\n  \"label\": \"postman-secret-leak\",\n  \"requirement\": \"Build a URL shortener service that creates short links, redirects visitors to the original URL and reports click statistics.\",\n  \"autoApprove\": true,\n  \"fault\": \"SECRET_LEAK\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"run accepted (202)\", () => pm.response.to.have.status(202));",
+                  "if (pm.response.code === 409) {",
+                  "    console.warn(\"Another run is still active. Stop it (Operator controls) or wait for it to finish.\");",
+                  "}",
+                  "const body = pm.response.json();",
+                  "pm.test(\"runId returned\", () => pm.expect(body.runId).to.match(/^run-/));",
+                  "pm.collectionVariables.set(\"runId\", body.runId);",
+                  "pm.collectionVariables.set(\"polls\", 0);",
+                  "const sent = JSON.parse(pm.request.body.raw.replace(/{{requirement}}/g, JSON.stringify(pm.collectionVariables.get(\"requirement\")).slice(1, -1)));",
+                  "if (sent.requirement) { pm.collectionVariables.set(\"requirement\", sent.requirement); }",
+                  "pm.collectionVariables.set(\"rejectNodeOnce\", \"\");",
+                  "pm.collectionVariables.set(\"rejectedAlready\", \"\");",
+                  "pm.collectionVariables.set(\"clarificationAnswers\", '{}');",
+                  "console.log(\"Started \" + body.runId);",
+                  "next(\"SL \u00b7 Wait for checkpoint\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "SL \u00b7 Wait for checkpoint",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/pending",
+            "description": "Polls until a human checkpoint is waiting or the run has finished. Manual mode: click Send until a checkpoint appears, then send 'Decide checkpoint'."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"pending list returned\", () => pm.response.to.have.status(200));",
+                  "const pending = pm.response.json();",
+                  "const polls = Number(pm.collectionVariables.get(\"polls\") || 0);",
+                  "const maxPolls = Number(pm.collectionVariables.get(\"maxPolls\") || 300);",
+                  "const delay = Number(pm.collectionVariables.get(\"pollDelayMs\") || 2000);",
+                  "if (pending.length > 0) {",
+                  "    const p = pending[0];",
+                  "    pm.collectionVariables.set(\"nodeId\", p.nodeId);",
+                  "    pm.collectionVariables.set(\"checkpointKind\", p.kind);",
+                  "    pm.collectionVariables.set(\"polls\", 0);",
+                  "    console.log(\"Human needed at '\" + p.nodeId + \"' (\" + p.kind + \"): \" + p.summary);",
+                  "    next(\"SL \u00b7 Decide checkpoint\");",
+                  "} else {",
+                  "    pm.sendRequest(pm.collectionVariables.get(\"baseUrl\") + \"/runs/\" + pm.collectionVariables.get(\"runId\"), (err, res) => {",
+                  "        const status = err ? \"UNKNOWN\" : res.json().metrics.status;",
+                  "        if (status === \"COMPLETED\" || status === \"STOPPED\") {",
+                  "            console.log(\"Run finished: \" + status);",
+                  "            pm.collectionVariables.set(\"polls\", 0);",
+                  "            next(\"SL \u00b7 Verify outcome\");",
+                  "        } else if (polls >= maxPolls) {",
+                  "            pm.test(\"run finished within \" + maxPolls + \" polls\", () => pm.expect.fail(\"still \" + status));",
+                  "            next(null);",
+                  "        } else {",
+                  "            pm.collectionVariables.set(\"polls\", polls + 1);",
+                  "            console.log(\"Still \" + status + \", no checkpoint yet (poll \" + (polls + 1) + \"). In manual mode: click Send again.\");",
+                  "            setTimeout(() => next(\"SL \u00b7 Wait for checkpoint\"), delay);",
+                  "        }",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "SL \u00b7 Decide checkpoint",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs/{{runId}}/nodes/{{nodeId}}/approval",
+            "description": "Approves (or answers) the checkpoint found by 'Wait for checkpoint'.",
+            "body": {
+              "mode": "raw",
+              "raw": "{{decisionBody}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Builds the decision for whatever checkpoint 'Wait for checkpoint' found.",
+                  "const node = pm.collectionVariables.get(\"nodeId\");",
+                  "const kind = pm.collectionVariables.get(\"checkpointKind\");",
+                  "const approver = pm.collectionVariables.get(\"approver\") || \"tester\";",
+                  "let decision;",
+                  "if (kind === \"CLARIFICATION\") {",
+                  "    const answers = JSON.parse(pm.collectionVariables.get(\"clarificationAnswers\") || \"{}\");",
+                  "    decision = { approved: true, approver: approver, comment: \"scope confirmed from Postman\", answers: answers };",
+                  "} else if (node === pm.collectionVariables.get(\"rejectNodeOnce\") && !pm.collectionVariables.get(\"rejectedAlready\")) {",
+                  "    pm.collectionVariables.set(\"rejectedAlready\", \"yes\");",
+                  "    decision = { approved: false, approver: approver, comment: \"Rejected once from Postman: please also describe pagination of the stats endpoint.\" };",
+                  "} else {",
+                  "    decision = { approved: true, approver: approver, comment: \"approved from Postman\" };",
+                  "}",
+                  "pm.collectionVariables.set(\"decisionBody\", JSON.stringify(decision));",
+                  "console.log(\"Deciding '\" + node + \"': \" + JSON.stringify(decision));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "pm.test(\"decision delivered (204)\", () => pm.response.to.have.status(204));",
+                  "next(\"SL \u00b7 Wait for checkpoint\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "SL \u00b7 Verify outcome",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"run info returned\", () => pm.response.to.have.status(200));",
+                  "const info = pm.response.json();",
+                  "const m = info.metrics;",
+                  "const nodes = info.nodes;",
+                  "const ids = nodes.map(n => n.id);",
+                  "console.log(\"Outcome: \" + JSON.stringify(m));",
+                  "pm.test(\"status STOPPED (safe-stop)\", () => { pm.expect(m.status).to.eql(\"STOPPED\"); });",
+                  "pm.test(\"one safe-stop\", () => { pm.expect(m.safeStops).to.eql(1); });",
+                  "pm.test(\"not all nodes done\", () => { pm.expect(m.doneNodes).to.be.below(m.totalNodes); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "SL \u00b7 Audit trail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/events"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"events returned\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"audit hash chain verifies\", () => pm.expect(body.chainVerified).to.be.true);",
+                  "pm.test(\"run started and finished events present\", () => {",
+                  "    const types = body.events.map(e => e.type);",
+                  "    pm.expect(types).to.include(\"RUN_STARTED\");",
+                  "    pm.expect(types).to.include(\"RUN_FINISHED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8. Operator controls and error handling",
+      "description": "Starts a run that waits for you, proves a second run is refused, stops the first one, then checks the API's error responses.",
+      "item": [
+        {
+          "name": "OP \u00b7 Start run that waits for approval",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scenario\": \"GREENFIELD\",\n  \"label\": \"postman-operator-stop\",\n  \"autoApprove\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"run accepted (202)\", () => pm.response.to.have.status(202));",
+                  "pm.collectionVariables.set(\"runId\", pm.response.json().runId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "OP \u00b7 Second run is refused while one is active",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scenario\": \"GREENFIELD\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 Conflict\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"explains the shared working folder\", () => pm.expect(pm.response.json().detail).to.include(\"still active\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "OP \u00b7 Stop the run",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/stop"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"stop accepted (202)\", () => pm.response.to.have.status(202));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "OP \u00b7 Run is STOPPED",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const next = (n) => (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(n) : postman.setNextRequest(n);",
+                  "const m = pm.response.json().metrics;",
+                  "const polls = Number(pm.collectionVariables.get(\"polls\") || 0);",
+                  "if (m.status !== \"STOPPED\" && polls < 30) {",
+                  "    pm.collectionVariables.set(\"polls\", polls + 1);",
+                  "    setTimeout(() => next(\"OP \u00b7 Run is STOPPED\"), 1000);",
+                  "} else {",
+                  "    pm.collectionVariables.set(\"polls\", 0);",
+                  "    pm.test(\"status STOPPED\", () => pm.expect(m.status).to.eql(\"STOPPED\"));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR \u00b7 Unknown run -> 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/run-doesnotexist"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR \u00b7 Decision without approver -> 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs/{{runId}}/nodes/design/approval",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"approved\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR \u00b7 Decide a node that is not waiting -> 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs/{{runId}}/nodes/design/approval",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"approved\": true,\n  \"approver\": \"tester\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR \u00b7 Stop a finished run -> 409",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/stop"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR \u00b7 Lineage of an unknown file -> 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/runs/{{runId}}/lineage?path=does/not/exist.md"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR \u00b7 Unknown scenario -> 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scenario\": \"SPACESHIP\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR \u00b7 Missing scenario -> 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/runs",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"no-scenario\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "approver",
+      "value": "tester"
+    },
+    {
+      "key": "pollDelayMs",
+      "value": "2000"
+    },
+    {
+      "key": "maxPolls",
+      "value": "300"
+    },
+    {
+      "key": "runId",
+      "value": ""
+    },
+    {
+      "key": "nodeId",
+      "value": ""
+    },
+    {
+      "key": "checkpointKind",
+      "value": ""
+    },
+    {
+      "key": "decisionBody",
+      "value": ""
+    },
+    {
+      "key": "rejectNodeOnce",
+      "value": ""
+    },
+    {
+      "key": "rejectedAlready",
+      "value": ""
+    },
+    {
+      "key": "clarificationAnswers",
+      "value": "{}"
+    },
+    {
+      "key": "polls",
+      "value": "0"
+    },
+    {
+      "key": "requirement",
+      "value": "Build a URL shortener that creates short links with optional expiry, redirects visitors and reports click statistics."
+    }
+  ]
+}
