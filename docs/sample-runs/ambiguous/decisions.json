@@ -1,0 +1,101 @@
+[ {
+  "id" : "D-1",
+  "node" : "interpret",
+  "actor" : "requirements",
+  "decision" : "completed",
+  "rationale" : "refused to guess the scope of an ambiguous requirement; asked the human instead",
+  "inputs" : { },
+  "outputs" : {
+    "docs/interpretations.md" : "886d1ac45d6d71bdafc1be928da1897e0d4422bfea5bfe74c42d7f2f8fcb5e8b"
+  },
+  "at" : "2026-10-15T08:25:23.487099866Z"
+}, {
+  "id" : "D-2",
+  "node" : "interpret",
+  "actor" : "human:simulated-reviewer",
+  "decision" : "approved",
+  "rationale" : "scripted clarification answers",
+  "inputs" : { },
+  "outputs" : {
+    "docs/interpretations.md" : "886d1ac45d6d71bdafc1be928da1897e0d4422bfea5bfe74c42d7f2f8fcb5e8b"
+  },
+  "at" : "2026-10-15T08:25:23.487256775Z"
+}, {
+  "id" : "D-3",
+  "node" : "interpret",
+  "actor" : "human:simulated-reviewer",
+  "decision" : "scope-confirmed",
+  "rationale" : "confirmed interpretations: [abuse-rate-limiting, link-expiry]",
+  "inputs" : { },
+  "outputs" : {
+    "docs/interpretations.md" : "886d1ac45d6d71bdafc1be928da1897e0d4422bfea5bfe74c42d7f2f8fcb5e8b"
+  },
+  "at" : "2026-10-15T08:25:23.495430767Z"
+}, {
+  "id" : "D-4",
+  "node" : "plan-abuse-rate-limiting",
+  "actor" : "scope-planner",
+  "decision" : "completed",
+  "rationale" : "planned only because a human confirmed this interpretation",
+  "inputs" : {
+    "docs/interpretations.md" : "886d1ac45d6d71bdafc1be928da1897e0d4422bfea5bfe74c42d7f2f8fcb5e8b"
+  },
+  "outputs" : {
+    "docs/plan-abuse-rate-limiting.md" : "7800a2e5903a575744eded1efda99334a48aeb13874709dc958c8a8cc5056436"
+  },
+  "at" : "2026-10-15T08:25:23.526954981Z"
+}, {
+  "id" : "D-5",
+  "node" : "plan-link-expiry",
+  "actor" : "scope-planner",
+  "decision" : "completed",
+  "rationale" : "planned only because a human confirmed this interpretation",
+  "inputs" : {
+    "docs/interpretations.md" : "886d1ac45d6d71bdafc1be928da1897e0d4422bfea5bfe74c42d7f2f8fcb5e8b"
+  },
+  "outputs" : {
+    "docs/plan-link-expiry.md" : "2bded9ddb0af8855d56c609e5309a30320683be74f32a319b27b1cb6dc63936f"
+  },
+  "at" : "2026-10-15T08:25:23.544131738Z"
+}, {
+  "id" : "D-6",
+  "node" : "scoped-plan",
+  "actor" : "scope-planner",
+  "decision" : "completed",
+  "rationale" : "the human-confirmed scope bounds the plan; excluded items are listed explicitly",
+  "inputs" : {
+    "docs/plan-abuse-rate-limiting.md" : "7800a2e5903a575744eded1efda99334a48aeb13874709dc958c8a8cc5056436",
+    "docs/plan-link-expiry.md" : "2bded9ddb0af8855d56c609e5309a30320683be74f32a319b27b1cb6dc63936f",
+    "docs/interpretations.md" : "886d1ac45d6d71bdafc1be928da1897e0d4422bfea5bfe74c42d7f2f8fcb5e8b"
+  },
+  "outputs" : {
+    "docs/scoped-plan.md" : "42a24982d2ddb3a511a9d641e0aae3ad76f94549c58c378a7389c8d3f784db76"
+  },
+  "at" : "2026-10-15T08:25:23.562277306Z"
+}, {
+  "id" : "D-7",
+  "node" : "signoff",
+  "actor" : "reviewer",
+  "decision" : "completed",
+  "rationale" : "the reviewer only summarises recorded facts; it does not approve its own work",
+  "inputs" : {
+    "docs/scoped-plan.md" : "42a24982d2ddb3a511a9d641e0aae3ad76f94549c58c378a7389c8d3f784db76"
+  },
+  "outputs" : {
+    "docs/engineering-summary.md" : "6d403baf34ce94adcfb321d289608a304ce3f38854703f9c43f8a695607205d7"
+  },
+  "at" : "2026-10-15T08:25:23.581960896Z"
+}, {
+  "id" : "D-8",
+  "node" : "signoff",
+  "actor" : "human:simulated-reviewer",
+  "decision" : "approved",
+  "rationale" : "reviewed and approved (simulated)",
+  "inputs" : {
+    "docs/scoped-plan.md" : "42a24982d2ddb3a511a9d641e0aae3ad76f94549c58c378a7389c8d3f784db76"
+  },
+  "outputs" : {
+    "docs/engineering-summary.md" : "6d403baf34ce94adcfb321d289608a304ce3f38854703f9c43f8a695607205d7"
+  },
+  "at" : "2026-10-15T08:25:23.582123112Z"
+} ]

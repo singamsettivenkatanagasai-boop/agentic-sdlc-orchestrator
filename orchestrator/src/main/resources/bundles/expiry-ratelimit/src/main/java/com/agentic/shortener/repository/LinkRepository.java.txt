@@ -1,0 +1,19 @@
+package com.agentic.shortener.repository;
+
+import com.agentic.shortener.model.Link;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+
+public interface LinkRepository extends JpaRepository<Link, Long> {
+
+    Optional<Link> findByCode(String code);
+
+    boolean existsByCode(String code);
+
+    /** Used to make "create" idempotent: the same URL maps to the same live link. */
+    Optional<Link> findFirstByLongUrlAndDeletedFalse(String longUrl);
+
+    /** Idempotent create for links without an expiry. */
+    Optional<Link> findFirstByLongUrlAndDeletedFalseAndExpiresAtIsNull(String longUrl);
+}

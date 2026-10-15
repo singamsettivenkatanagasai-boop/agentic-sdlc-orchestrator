@@ -1,0 +1,53 @@
+[ {
+  "id" : "D-1",
+  "node" : "requirements",
+  "actor" : "requirements",
+  "decision" : "completed",
+  "rationale" : "kept scope to what the requirement states; recorded 4 assumptions explicitly instead of guessing silently",
+  "inputs" : { },
+  "outputs" : {
+    "docs/requirements.md" : "07ddd24182b7aa02db069ace1802f62d1e656475e6fd255c9effe465a518727f"
+  },
+  "at" : "2026-10-15T08:25:24.995936587Z"
+}, {
+  "id" : "D-2",
+  "node" : "design",
+  "actor" : "architect",
+  "decision" : "completed",
+  "rationale" : "contract-first: the OpenAPI file is the reviewed artefact that the implementation must follow",
+  "inputs" : {
+    "docs/requirements.md" : "07ddd24182b7aa02db069ace1802f62d1e656475e6fd255c9effe465a518727f"
+  },
+  "outputs" : {
+    "docs/design.md" : "6c089dafa586b99e7e8d916fdfe4b92870e015b42960cca5cad83f82195328f9",
+    "openapi.yaml" : "488e995a81b4e8a38f617f63d0cb171bd5f64ea668ac662c3e890170dd786cef"
+  },
+  "at" : "2026-10-15T08:25:25.019736936Z"
+}, {
+  "id" : "D-3",
+  "node" : "design",
+  "actor" : "human:simulated-reviewer",
+  "decision" : "approved",
+  "rationale" : "reviewed and approved (simulated)",
+  "inputs" : {
+    "docs/requirements.md" : "07ddd24182b7aa02db069ace1802f62d1e656475e6fd255c9effe465a518727f"
+  },
+  "outputs" : {
+    "docs/design.md" : "6c089dafa586b99e7e8d916fdfe4b92870e015b42960cca5cad83f82195328f9",
+    "openapi.yaml" : "488e995a81b4e8a38f617f63d0cb171bd5f64ea668ac662c3e890170dd786cef"
+  },
+  "at" : "2026-10-15T08:25:25.021881914Z"
+}, {
+  "id" : "D-4",
+  "node" : "test-plan",
+  "actor" : "test",
+  "decision" : "completed",
+  "rationale" : "tests are planned from the requirement in parallel with the design, so they are not biased by the implementation",
+  "inputs" : {
+    "docs/requirements.md" : "07ddd24182b7aa02db069ace1802f62d1e656475e6fd255c9effe465a518727f"
+  },
+  "outputs" : {
+    "docs/test-plan.md" : "bf12b68911d95f8af3612462c526423f48b8da1d6bdc5a38457f96d977b19015"
+  },
+  "at" : "2026-10-15T08:25:25.049880560Z"
+} ]

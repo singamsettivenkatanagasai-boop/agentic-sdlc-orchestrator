@@ -1,0 +1,56 @@
+[ {
+  "id" : "interpret",
+  "agent" : "requirements",
+  "fallbackAgent" : null,
+  "risk" : "LOW",
+  "state" : "DONE",
+  "attempts" : 1,
+  "dependsOn" : [ ],
+  "entryGate" : "none",
+  "exitGate" : "outputs-exist:docs/interpretations.md",
+  "description" : "List the possible readings of the vague requirement and ask a human which are in scope"
+}, {
+  "id" : "scoped-plan",
+  "agent" : "scope-planner",
+  "fallbackAgent" : null,
+  "risk" : "MEDIUM",
+  "state" : "DONE",
+  "attempts" : 1,
+  "dependsOn" : [ "interpret", "plan-abuse-rate-limiting", "plan-link-expiry" ],
+  "entryGate" : "none",
+  "exitGate" : "outputs-exist:docs/scoped-plan.md",
+  "description" : "Merge the plans of the confirmed interpretations into one scoped plan"
+}, {
+  "id" : "signoff",
+  "agent" : "reviewer",
+  "fallbackAgent" : null,
+  "risk" : "HIGH",
+  "state" : "DONE",
+  "attempts" : 1,
+  "dependsOn" : [ "scoped-plan" ],
+  "entryGate" : "none",
+  "exitGate" : "decisions-recorded",
+  "description" : "Human sign-off of the scoped plan"
+}, {
+  "id" : "plan-abuse-rate-limiting",
+  "agent" : "scope-planner",
+  "fallbackAgent" : null,
+  "risk" : "LOW",
+  "state" : "DONE",
+  "attempts" : 1,
+  "dependsOn" : [ "interpret" ],
+  "entryGate" : "none",
+  "exitGate" : "outputs-exist:docs/plan-abuse-rate-limiting.md",
+  "description" : "Plan for the confirmed interpretation 'abuse-rate-limiting'"
+}, {
+  "id" : "plan-link-expiry",
+  "agent" : "scope-planner",
+  "fallbackAgent" : null,
+  "risk" : "LOW",
+  "state" : "DONE",
+  "attempts" : 1,
+  "dependsOn" : [ "interpret" ],
+  "entryGate" : "none",
+  "exitGate" : "outputs-exist:docs/plan-link-expiry.md",
+  "description" : "Plan for the confirmed interpretation 'link-expiry'"
+} ]
